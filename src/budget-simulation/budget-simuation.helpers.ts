@@ -69,18 +69,18 @@ export function computeBillsFinal(
     runId: number,
     monthIndex: number,
     estimated: number
-): { actual: number; delta: number } {
+): { estimated: number; actual: number; delta: number } {
     const seed = `${runId}:${monthIndex}:bills`;
     const r = deterministicRandom(seed);
     const factor = (r - 0.5) * 0.1;
     const actual = Math.round(estimated * (1 + factor));
     const delta = actual - estimated;
-    return { actual, delta };
+    return { estimated, actual, delta };
 }
 
 export function getUserId(req: { user?: { id: string } }): string {
-  const id = req?.user?.id;
-  if (id == null || id === '')
-    throw new UnauthorizedException('User not authenticated');
-  return id;
+    const id = req?.user?.id;
+    if (id == null || id === '')
+        throw new UnauthorizedException('User not authenticated');
+    return id;
 }

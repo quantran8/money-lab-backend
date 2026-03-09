@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Request, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { BudgetService } from './budget-simuation.service';
+import { Controller, Get, Post, Body, Request, UnauthorizedException, UseGuards, Param } from '@nestjs/common';
+import { BudgetSimulationService } from './budget-simuation.service';
 import {
     StartRunDto,
     StartMonthDto,
@@ -13,7 +13,7 @@ import { getUserId } from './budget-simuation.helpers';
 @Controller('budget-simulation')
 @UseGuards(AuthGuard)
 export class BudgetController {
-    constructor(private readonly budgetService: BudgetService) { }
+    constructor(private readonly budgetService: BudgetSimulationService) { }
 
     @Get('get-setup-options')
     getSetupOptions() {
@@ -38,6 +38,8 @@ export class BudgetController {
             body.allocations,
             body.billReserveOptionCode,
             body.spendModeCode,
+            body.carryOverByJar ?? {},
+            body.convertToFreeCashByJar ?? {},
         );
     }
 
@@ -61,5 +63,10 @@ export class BudgetController {
     @Get('active-run')
     getActiveRun(@Request() req: { user?: { id: string } }) {
         return this.budgetService.getActiveBudgetRun(getUserId(req));
+    }
+
+    @Post('run/:runId/prepare_next_month')
+    prepareNextMonth(@Request() req: { user?: { id: string } }, @Param('runId') runId: string) {
+        return this.budgetService.prepareNextMonth(getUserId(req), parseInt(runId));
     }
 }

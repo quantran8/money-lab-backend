@@ -1,14 +1,25 @@
-// class JarCode {
-//     static fun = "fun"
-//     static learning = "learning"
-//     static give = "give"
-//     static futureYou = "future_you"
-// }  
-
 export enum JarCode {
-    fun = "fun",
-    learning = "learning",
-    give = "give",
-    futureYou = "future_you",
+  fun = 'fun',
+  learning = 'learning',
+  give = 'give',
+  futureYou = 'future_you',
+}
 
+export enum CommitmentLayer {
+  locked = 'locked',
+  bills = 'bills',
+  foodReserve = 'food_reserve',
+}
+
+export enum BillReserveOptionCode {
+  none = 'NONE',
+  half = 'HALF',
+  high = 'HIGH',
+  full = 'FULL',
+}
+
+export enum SpendModeCode {
+  normal = 'NORMAL',
+  enjoy = 'ENJOY',
+  save = 'SAVE',
 }
