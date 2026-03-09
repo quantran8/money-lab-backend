@@ -1,4 +1,3 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'crypto';
 
 /**
@@ -78,9 +77,3 @@ export function computeBillsFinal(
     return { estimated, actual, delta };
 }
 
-export function getUserId(req: { user?: { id: string } }): string {
-    const id = req?.user?.id;
-    if (id == null || id === '')
-        throw new UnauthorizedException('User not authenticated');
-    return id;
-}

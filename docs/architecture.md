@@ -1,405 +1,701 @@
-Backend Architecture Guidelines
+Architecture Guide v1.0 (Simplified)
 1. Overview
 
-This document defines the backend architecture standards for the project. The goal is to ensure:
+This document defines the backend architecture standards for the project.
 
-Scalable codebase
+Goals
+
+Maintainable codebase
 
 Clear separation of responsibilities
 
-Maintainable services
+Scalable architecture
 
-Consistent implementation across the team
+Consistent implementation
 
-The backend is built using NestJS and uses Supabase as the database layer.
+Technology Stack
 
-The architecture follows a modular layered design:
+Framework
 
-Controller → Service → Query → Database
+NestJS
+
+Database ORM
+
+Prisma
+
+Authentication
+
+Supabase
+
+Architecture
+
+The backend follows a modular layered architecture.
+
+Controller
+   ↓
+Service (Business Logic)
+   ↓
+Query / Repository
+   ↓
+Prisma
+   ↓
+Database
 
 Each layer has a clear responsibility.
 
 2. Architecture Layers
 2.1 Controller Layer
 
-The controller handles:
+Role
 
-HTTP requests
+Handle HTTP requests and responses.
 
-Request validation (DTO)
+Responsibilities
 
-Calling services
+Define API routes
 
-Returning responses
+Validate request input using DTOs
 
-Controllers must not contain business logic.
+Call service methods
 
-Example:
+Return responses
 
-@Get()
-async getUsers() {
-  return this.userService.getUsers();
-}
-
-Responsibilities:
-
-Handle routes
-
-Validate request DTO
-
-Call service
-
-Return response DTO
-
-2.2 Service Layer (Business Logic)
-
-The service layer contains the core business logic.
-
-Services should:
-
-Coordinate multiple queries
-
-Apply business rules
-
-Use mappers to format responses
-
-Services must not query the database directly.
-
-Example:
-
-async getUsers() {
-  const users = await this.userQuery.findAll();
-  return users.map(UserMapper.toResponse);
-}
-
-Responsibilities:
-
-Business logic
-
-Orchestrating queries
-
-Calling mappers
-
-Returning DTOs
-
-2.3 Query Layer (Database Access)
-
-The query layer is responsible for all database interactions.
-
-All Supabase queries must be located here.
-
-Example:
-
-async findAll() {
-  const { data } = await this.supabase
-    .from('users')
-    .select('*');
-
-  return data;
-}
-
-Responsibilities:
-
-Database queries
-
-Data retrieval
-
-Data persistence
-
-The query layer must not contain business logic.
-
-2.4 DTO Layer
-
-DTOs define the structure of:
-
-Request payloads
-
-Response objects
-
-Example request DTO:
-
-export class CreateUserDto {
-  name: string;
-  email: string;
-}
-
-Example response DTO:
-
-export class UserResponseDto {
-  id: string;
-  name: string;
-}
-
-DTOs ensure:
-
-Input validation
-
-Type safety
-
-Consistent API contracts
-
-2.5 Mapper Layer
-
-Mappers convert database entities into response DTOs.
-
-Example:
-
-export class UserMapper {
-  static toResponse(user: User): UserResponseDto {
-    return {
-      id: user.id,
-      name: user.name,
-    };
-  }
-}
-
-Benefits:
-
-Centralized transformation logic
-
-Reduced duplication
-
-Clean services
-
-3. Project Folder Structure
-
-The project is organized by domain modules.
-
-src
- ├ modules
- │
- │  └ users
- │     ├ controllers
- │     │  └ user.controller.ts
- │     │
- │     ├ services
- │     │  └ user.service.ts
- │     │
- │     ├ queries
- │     │  └ user.query.ts
- │     │
- │     ├ dto
- │     │  ├ create-user.dto.ts
- │     │  └ user-response.dto.ts
- │     │
- │     ├ mappers
- │     │  └ user.mapper.ts
- │     │
- │     └ user.module.ts
- │
- ├ common
- │   ├ guards
- │   ├ filters
- │   ├ interceptors
- │   └ utils
- │
- └ main.ts
-
-Modules should be organized by business domain, not by technical layer.
-
-Example domains:
-
-auth
-users
-wallets
-transactions
-portfolios
-analytics
-4. Request Flow
-
-Standard request lifecycle:
-
-Client Request
-      ↓
-Controller
-      ↓
-Service
-      ↓
-Query
-      ↓
-Database (Supabase)
-
-Response transformation:
-
-Database Entity
-      ↓
-Mapper
-      ↓
-Response DTO
-      ↓
-Client Response
-5. Coding Rules
-Services
-
-Services must:
-
-Contain business logic
-
-Coordinate queries
-
-Call mappers
-
-Services must not:
-
-Directly access Supabase
-
-Perform HTTP request validation
-
-Format responses manually
-
-Controllers
-
-Controllers must:
-
-Be thin
-
-Only call services
-
-Use DTOs
+Controllers must remain thin.
 
 Controllers must not:
 
-Contain business logic
+contain business logic
 
-Query databases
+access the database
 
-Queries
+call Prisma
 
-Queries must:
+construct queries
 
-Handle all Supabase calls
+Example
 
-Return raw data
+@Post('start-month')
+startMonth(
+  @Request() req,
+  @Body() dto: StartMonthDto
+) {
+  return this.budgetService.startMonth(
+    req.user.id,
+    dto.runId,
+    dto.allocations
+  );
+}
+2.2 Service Layer (Business Logic)
 
-Queries must not:
+Role
 
-Contain business logic
+Implement business rules and application workflows.
 
-Return DTOs
+Responsibilities
 
-6. File Size Guidelines
+Implement business logic
 
-To maintain readability:
+Validate domain rules
 
-File	Recommended Size
-Controller	< 200 lines
-Service	< 400 lines
-Query	< 300 lines
+Coordinate query and repository operations
 
-If a file grows beyond these limits, it should be refactored.
+Handle transactions
 
-7. Dependency Flow Rules
+Throw HTTP exceptions when rules fail
 
-Allowed dependency direction:
+Services must not:
 
-Controller → Service → Query
+know HTTP details
 
-Not allowed:
+call Prisma directly
 
-Controller → Query
-Query → Service
+construct ORM queries
 
-8. Data Access Layer
+Example
 
-The project should not depend directly on a specific database provider or ORM.
-All database interactions must be abstracted through the Query Layer (Data Access Layer).
+async startMonth(userId: string, runId: number) {
 
-This allows the system to switch database technologies in the future without impacting the service or controller layers.
+  const run = await this.runQuery.findRunWithLatestMonth(BigInt(runId));
 
-Example possible database implementations:
-
-PostgreSQL
-
-MySQL
-
-MongoDB
-
-Supabase
-
-Prisma
-
-TypeORM
-
-The database provider should be injected through a shared infrastructure provider.
-
-Example:
-
-common/providers/database.provider.ts
-
-Query classes should use this provider to interact with the database.
-
-Example:
-
-export class UserQuery {
-  constructor(private readonly db: DatabaseClient) {}
-
-  async findAll() {
-    return this.db.users.findMany();
+  if (!run || run.userId !== userId) {
+    throw new ForbiddenException('Run not found');
   }
+
+  const income = run.jobState.currentMonthlyIncome;
+
+  return {
+    monthId: run.months[0].id.toString(),
+    income
+  };
+
 }
 
-The rest of the application should not depend on a specific database implementation.
+Services should read like business logic, not database queries.
 
-Allowed dependency flow:
+2.3 Query Layer (Read Operations)
 
-Controller → Service → Query → Database Provider
+The Query layer handles database read operations.
 
-Key principles:
+Responsibilities
 
-Services must not access the database directly
+Fetch data from database
 
-All database queries must live in the Query layer
+Encapsulate query shapes
 
-Database providers must be injectable
+Define relations (include/select)
 
-Database implementation must be replaceable
+Hide Prisma implementation from services
 
-This design ensures the system remains flexible and database-agnostic.
+Example
 
-9. Best Practices
+@Injectable()
+export class BudgetRunQuery {
 
-Recommended practices:
+  constructor(private readonly prisma: PrismaService) {}
 
-Use DTO validation
+  async findRunWithLatestMonth(runId: bigint) {
+    return this.prisma.budgetRun.findUnique({
+      where: { id: runId },
+      include: {
+        months: {
+          orderBy: { monthIndex: 'desc' },
+          take: 1
+        }
+      }
+    });
+  }
 
-Keep controllers thin
+}
 
-Isolate database queries
+Services should call intent-based query methods, not build queries.
 
-Use mappers for response formatting
+Example usage
 
-Organize modules by domain
+const run = await this.runQuery.findRunWithLatestMonth(runId);
+2.4 Repository Layer (Write Operations)
 
-Avoid:
+Repositories handle database mutations.
 
-Large service files
+Responsibilities
 
-Business logic inside controllers
+Create entities
 
-Repeated mapping logic
+Update entities
 
-Direct database access from services
+Delete entities
 
+Encapsulate Prisma write operations
+
+Example
+
+@Injectable()
+export class BudgetRunRepository {
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async updateRun(id: bigint, data: Prisma.BudgetRunUpdateInput) {
+    return this.prisma.budgetRun.update({
+      where: { id },
+      data
+    });
+  }
+
+}
+
+Repositories must not:
+
+contain business logic
+
+throw HTTP exceptions
+
+3. DTO Layer
+
+DTOs define API contracts and validate input.
+
+Libraries used
+
+class-validator
+
+class-transformer
+
+Example
+
+export class StartMonthDto {
+
+  @IsInt()
+  runId: number;
+
+  @IsObject()
+  allocations: Record<string, number>;
+
+  @IsOptional()
+  @IsObject()
+  carryOverByJar?: Record<string, number>;
+
+}
+
+DTOs should contain all request validation logic.
+
+4. Transactions
+
+Operations involving multiple writes must use database transactions.
+
+Transactions are handled at the service layer.
+
+Example
+
+await this.prisma.$transaction(async (tx) => {
+
+  await this.runRepository.updateRun(runId, data);
+
+  await this.monthRepository.createMonth(monthData);
+
+});
+
+Repositories may accept TransactionClient if needed.
+
+5. Project Structure
+
+Code should be organized by domain, not by technical layer.
+
+Example
+
+src/
+
+auth/
+  auth.controller.ts
+  auth.service.ts
+  auth.module.ts
+
+budget-simulation/
+  dto/
+  queries/
+  repositories/
+
+  budget-simulation.controller.ts
+  budget-simulation.service.ts
+  budget-simulation.module.ts
+
+learn/
+  dto/
+  learn.controller.ts
+  learn.service.ts
+  learn.module.ts
+
+common/
+  utils/
+  interceptors/
+  guards/
+
+prisma/
+  prisma.service.ts
+
+supabase/
+  supabase.service.ts
+
+app.module.ts
+main.ts
+
+Each domain module owns:
+
+controller
+
+service
+
+queries
+
+repositories
+
+DTOs
+
+6. Dependency Flow
+
+Allowed
+
+Controller → Service
+Service → Query
+Service → Repository
+Query → Prisma
+Repository → Prisma
+
+Not allowed
+
+Controller → Query
+Controller → Repository
+Controller → Prisma
+Service → Prisma
+Query → Service
+Repository → Service
+
+This ensures clean separation of concerns.
+
+7. Error Handling
+
+Services may throw HTTP exceptions when business rules fail.
+
+Examples
+
+BadRequestException
+
+ForbiddenException
+
+NotFoundException
+
+ConflictException
+
+Example
+
+if (!run) {
+  throw new NotFoundException('Run not found');
+}
+
+Query and Repository layers should not throw HTTP exceptions.
+
+They should return:
+
+entity
+
+null if not found
+
+8. Logging
+
+Unexpected errors should be logged in the service layer.
+
+Example
+
+private readonly logger = new Logger(Service.name);
+
+Logging helps diagnose issues in production.
+
+9. API Responses
+
+APIs should return plain JSON objects.
+
+Example
+
+{
+  "monthId": "12",
+  "income": 5000
+}
+
+Pagination responses may include metadata.
+
+Example
+
+{
+  "data": [...],
+  "meta": {
+    "page": 1,
+    "pageSize": 10,
+    "total": 50
+  }
+}
 10. Summary
 
-The architecture ensures:
+Final architecture flow
 
-Clear separation of concerns
-
-Scalable module structure
-
-Maintainable business logic
-
-Consistent coding practices
-
-Architecture overview:
-
+Client
+   ↓
 Controller
    ↓
 Service
    ↓
-Query
+Query / Repository
+   ↓
+Prisma
    ↓
 Database
 
-This structure enables the project to scale efficiently as the codebase and team grow.
+Responsibilities
+
+Layer	Responsibility
+Controller	HTTP handling + validation
+Service	Business logic
+Query	Database reads
+Repository	Database writes
+Prisma	ORM
+Database	Data storage
+
+This architecture ensures
+
+clear separation of concerns
+
+maintainable code
+
+scalable modules
+
+consistent backend implementation
+
+11. Service Design Rules
+
+The Service layer contains application business logic and orchestrates workflows.
+
+Without clear rules, services tend to grow into large, hard-to-maintain classes.
+
+This section defines guidelines to keep services clean and maintainable.
+
+11.1 Services Should Orchestrate, Not Implement Everything
+
+Services should coordinate operations between:
+
+queries
+
+repositories
+
+domain helpers
+
+Services should not implement large calculation logic directly.
+
+Bad example
+
+async simulateMonth() {
+  // 200 lines of calculations here
+}
+
+Better
+
+async simulateMonth() {
+
+  const run = await this.runQuery.findRunById(...)
+
+  const result = BudgetCalculator.calculateMonth(run)
+
+  return result
+
+}
+
+Move complex logic to domain helpers.
+
+11.2 Extract Domain Logic
+
+When business logic becomes complex, move it to a domain utility or domain service.
+
+Example
+
+domain/budget-calculator.ts
+
+Example
+
+export class BudgetCalculator {
+
+  static calculateMonth(run: BudgetRun) {
+
+    // complex logic here
+
+  }
+
+}
+
+Benefits
+
+easier testing
+
+smaller services
+
+reusable domain logic
+
+11.3 One Service Method = One Business Use Case
+
+Each service method should represent a single business action.
+
+Examples
+
+Good
+
+startMonth()
+simulateMonth()
+createRun()
+updateIncome()
+
+Bad
+
+processBudgetWorkflow()
+handleBudgetOperation()
+
+Service methods should map clearly to business use cases.
+
+11.4 Avoid Large Services
+
+If a service becomes too large, split it.
+
+Example
+
+Bad
+
+budget-simulation.service.ts
+
+1000+ lines.
+
+Better
+
+budget-run.service.ts
+budget-month.service.ts
+budget-simulation.service.ts
+
+Split by subdomain or workflow.
+
+11.5 Services Must Not Contain Database Queries
+
+Services should call Query or Repository methods.
+
+Bad
+
+await this.prisma.budgetRun.findUnique(...)
+
+Correct
+
+await this.runQuery.findRunWithLatestMonth(...)
+
+Benefits
+
+services stay readable
+
+database logic centralized
+
+easier refactoring
+
+11.6 Services Should Validate Business Rules
+
+Domain constraints must be enforced in services.
+
+Example
+
+if (!run || run.userId !== userId) {
+  throw new ForbiddenException('Run not found')
+}
+
+Services are responsible for domain validation.
+
+11.7 Use Transactions for Multi-Step Writes
+
+If multiple database writes must succeed together, use transactions.
+
+Example
+
+await this.prisma.$transaction(async (tx) => {
+
+  await this.runRepository.updateRun(tx, runId, data)
+
+  await this.monthRepository.createMonth(tx, monthData)
+
+})
+
+This ensures data consistency.
+
+11.8 Keep Services Readable
+
+Service methods should read like business workflows.
+
+Good example
+
+async startMonth(userId: string, runId: number) {
+
+  const run = await this.runQuery.findRunWithLatestMonth(runId)
+
+  this.validateOwnership(run, userId)
+
+  const simulation = BudgetCalculator.simulateMonth(run)
+
+  await this.monthRepository.createMonth(simulation)
+
+  return simulation
+
+}
+
+Anyone reading this code should understand the business process immediately.
+
+11.9 Extract Reusable Validation Logic
+
+If validation logic repeats, extract helper methods.
+
+Example
+
+private validateOwnership(run: Run, userId: string) {
+
+  if (!run || run.userId !== userId) {
+    throw new ForbiddenException('Run not found')
+  }
+
+}
+
+Benefits
+
+avoids duplicated checks
+
+cleaner services
+
+11.10 Service Size Guidelines
+
+Services should remain reasonably small.
+
+Recommended guideline
+
+Item	Recommendation
+Service class	< 400 lines
+Service method	< 80 lines
+
+If exceeded, consider:
+
+extracting domain logic
+
+splitting services
+
+creating helpers
+
+Example Service Structure
+
+Example service
+
+@Injectable()
+export class BudgetSimulationService {
+
+  constructor(
+    private readonly runQuery: BudgetRunQuery,
+    private readonly runRepository: BudgetRunRepository
+  ) {}
+
+  async startMonth(userId: string, runId: number) {
+
+    const run = await this.runQuery.findRunWithLatestMonth(runId)
+
+    this.validateOwnership(run, userId)
+
+    const result = BudgetCalculator.simulateMonth(run)
+
+    await this.runRepository.updateRun(run.id, {
+      lastSimulatedAt: new Date()
+    })
+
+    return result
+  }
+
+  private validateOwnership(run: any, userId: string) {
+
+    if (!run || run.userId !== userId) {
+      throw new ForbiddenException('Run not found')
+    }
+
+  }
+
+}
+Summary
+
+Good services should:
+
+orchestrate workflows
+
+enforce business rules
+
+call queries and repositories
+
+remain readable
+
+Avoid:
+
+large services
+
+database queries inside services
+
+complex logic inside service methods
+
+Following these rules keeps services maintainable as the project grows.
