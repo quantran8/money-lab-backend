@@ -56,9 +56,10 @@ export class BudgetSimulationSetupService {
           id: t.id.toString(),
         })),
         housingUtilityModifiers: housingUtilityModifiersRaw.map((m) => ({
-          ...m,
-          id: m.id.toString(),
+          id: `${m.housingCommitmentId}-${m.utilityName}`,
           housingCommitmentId: m.housingCommitmentId.toString(),
+          utilityName: m.utilityName,
+          multiplier: m.multiplier,
         })),
         billReserveOptions: billReserveOptionsRaw.map((o) => ({
           code: o.code,

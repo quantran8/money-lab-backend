@@ -33,8 +33,7 @@ export class BudgetSimulationRunService {
   ) {}
 
   private async getBillReserveCoveragePct(code: string): Promise<number> {
-    const option =
-      await this.commitmentQuery.findBillReserveOptionByCode(code);
+    const option = await this.commitmentQuery.findBillReserveOptionByCode(code);
     if (!option)
       throw new BadRequestException(
         `Invalid bill_reserve_option_code: ${code}`,
@@ -127,17 +126,20 @@ export class BudgetSimulationRunService {
           })),
           ...billEstimatedTemplates,
         ],
-        jars: jarsAllocationArr.reduce((acc, curr) => {
-          const spent = spendByJarArr.find((s) => s.jarCode === curr.jarCode);
-          const spentAmount = spent?.spentAmount ?? 0;
-          const overflowIn = spent?.overflowInAmount ?? 0;
-          const overflowOut = spent?.overflowOutAmount ?? 0;
-          acc[curr.jarCode] = {
-            allocation: curr.amount,
-            balance: curr.amount - spentAmount + overflowIn - overflowOut,
-          };
-          return acc;
-        }, {} as Record<string, { allocation: number; balance: number }>),
+        jars: jarsAllocationArr.reduce(
+          (acc, curr) => {
+            const spent = spendByJarArr.find((s) => s.jarCode === curr.jarCode);
+            const spentAmount = spent?.spentAmount ?? 0;
+            const overflowIn = spent?.overflowInAmount ?? 0;
+            const overflowOut = spent?.overflowOutAmount ?? 0;
+            acc[curr.jarCode] = {
+              allocation: curr.amount,
+              balance: curr.amount - spentAmount + overflowIn - overflowOut,
+            };
+            return acc;
+          },
+          {} as Record<string, { allocation: number; balance: number }>,
+        ),
       };
     });
   }
@@ -216,14 +218,17 @@ export class BudgetSimulationRunService {
     });
   }
 
+  /**
+   * Starts a new month: creates month record and sets jar allocations.
+   * If previous month exists, next month allocation per jar = allocation target - prev balance
+   * (prev balance = jar allocation - jar spending for that month).
+   */
   async startMonth(
     userId: string,
     runId: number,
     allocations: Record<string, number>,
     billReserveOptionCode: string,
     spendModeCode: string,
-    carryOverByJar: Record<string, number> = {},
-    convertToFreeCashByJar: Record<string, number> = {},
   ) {
     return wrapAsync(this.logger, 'startMonth', async () => {
       const run = await this.runQuery.findRunWithJobState(BigInt(runId));
@@ -239,8 +244,7 @@ export class BudgetSimulationRunService {
 
       let prevMonthFreeCashBalance = 0;
       let prevJarBalances: Record<string, number> = {};
-      let totalConvertedToFreeCash = 0;
-      const finalAllocations = { ...allocations };
+      const jarsRefillNeeded = { ...allocations };
 
       if (prevMonth) {
         prevMonthFreeCashBalance = Math.max(0, Number(prevMonth.freeCash ?? 0));
@@ -249,15 +253,15 @@ export class BudgetSimulationRunService {
           prevMonth.id,
           coreJars,
         );
-        const prevSpendByJar =
-          await this.monthQuery.findSpendByJarForMonth(
-            prevMonth.id,
-            coreJars,
-          );
+        const prevSpendByJar = await this.monthQuery.findSpendByJarForMonth(
+          prevMonth.id,
+          coreJars,
+        );
 
         const allocByJar = Object.fromEntries(
           prevAllocs.map((a) => [a.jarCode, Number(a.amount)]),
         );
+
         const spendByJar = Object.fromEntries(
           prevSpendByJar.map((s) => [
             s.jarCode,
@@ -282,19 +286,9 @@ export class BudgetSimulationRunService {
         }
 
         for (const jar of coreJars) {
-          const carryOver = carryOverByJar[jar] ?? 0;
-          const convertToFreeCash = convertToFreeCashByJar[jar] ?? 0;
-          const prevBalance = prevJarBalances[jar] ?? 0;
-          if (carryOver < 0 || convertToFreeCash < 0)
-            throw new BadRequestException(
-              `Invalid carry over or convert for jar ${jar}: amounts must be >= 0`,
-            );
-          if (carryOver + convertToFreeCash > prevBalance)
-            throw new BadRequestException(
-              `Invalid jar ${jar}: carryOver + convertToFreeCash (${carryOver + convertToFreeCash}) must not exceed previous balance (${prevBalance})`,
-            );
-          totalConvertedToFreeCash += convertToFreeCash;
-          finalAllocations[jar] = (finalAllocations[jar] ?? 0) + carryOver;
+          const target = allocations[jar] ?? 0;
+          const remain = prevJarBalances[jar] ?? 0;
+          jarsRefillNeeded[jar] = Math.max(0, target - remain);
         }
       }
 
@@ -323,11 +317,10 @@ export class BudgetSimulationRunService {
           housingIds,
         );
 
-      const billTemplates =
-        await this.commitmentQuery.findBillTemplatesByLayer(
-          3,
-          CommitmentLayer.bills,
-        );
+      const billTemplates = await this.commitmentQuery.findBillTemplatesByLayer(
+        3,
+        CommitmentLayer.bills,
+      );
 
       const billsEstimated = billTemplates.reduce((sum, t) => {
         const modifier = housingUtilityModifiers.find(
@@ -348,7 +341,7 @@ export class BudgetSimulationRunService {
       if (leftToAllocate < 0)
         throw new BadRequestException('Guardrail failed: left_to_allocate < 0');
 
-      const allocSum = Object.values(allocations).reduce(
+      const allocSum = Object.values(jarsRefillNeeded).reduce(
         (sum, val) => sum + val,
         0,
       );
@@ -361,7 +354,7 @@ export class BudgetSimulationRunService {
 
       const cumulativeFreeCash = Math.max(
         0,
-        prevMonthFreeCashBalance + monthFreeCash + totalConvertedToFreeCash,
+        prevMonthFreeCashBalance + monthFreeCash,
       );
 
       return this.prisma.$transaction(async (tx) => {
@@ -393,7 +386,7 @@ export class BudgetSimulationRunService {
           tx,
         );
 
-        await this.upsertMonthAllocations(month.id, finalAllocations, tx);
+        await this.upsertMonthAllocations(month.id, allocations, tx);
 
         return {
           monthId: month.id.toString(),
@@ -469,11 +462,10 @@ export class BudgetSimulationRunService {
             )
           : [];
 
-      const billTemplates =
-        await this.commitmentQuery.findBillTemplatesByLayer(
-          run.moduleId,
-          CommitmentLayer.bills,
-        );
+      const billTemplates = await this.commitmentQuery.findBillTemplatesByLayer(
+        run.moduleId,
+        CommitmentLayer.bills,
+      );
 
       const estimatedBills = billTemplates.reduce((sum, t) => {
         const modifier = housingUtilityModifiers.find(
@@ -482,7 +474,8 @@ export class BudgetSimulationRunService {
         return sum + t.baseMonthlyAmount * (Number(modifier?.multiplier) ?? 1);
       }, 0);
 
-      const optionCode = latestMonth.billReserveOptionCode || BillReserveOptionCode.high;
+      const optionCode =
+        latestMonth.billReserveOptionCode || BillReserveOptionCode.high;
       const covPct = await this.getBillReserveCoveragePct(optionCode);
       const reserveTarget = Math.round((covPct / 100) * estimatedBills);
       const reserveStart = latestMonth.billReserveEnd;
@@ -495,19 +488,29 @@ export class BudgetSimulationRunService {
         JarCode.futureYou,
       ];
 
-      const jarsCarryOver: Record<string, number> = {};
+      const jarRefill: Array<{
+        jarCode: string;
+        target: number;
+        remaining: number;
+        refill: number;
+      }> = [];
 
       for (const jarCode of jarOrder) {
-        const allocation =
-          latestMonth.allocations.find((a) => a.jarCode === jarCode)?.amount ??
-          0;
+        const target =
+          Number(
+            latestMonth.allocations.find((a) => a.jarCode === jarCode)?.amount ??
+              0,
+          );
         const spend = latestMonth.spendByJar.find((s) => s.jarCode === jarCode);
-        const balance =
-          Number(allocation) -
-          (spend?.spentAmount ? Number(spend.spentAmount) : 0) +
-          (spend?.overflowInAmount ? Number(spend.overflowInAmount) : 0) -
-          (spend?.overflowOutAmount ? Number(spend.overflowOutAmount) : 0);
-        jarsCarryOver[jarCode] = Math.max(0, balance);
+        const remaining = Math.max(
+          0,
+          target -
+            (spend?.spentAmount ? Number(spend.spentAmount) : 0) +
+            (spend?.overflowInAmount ? Number(spend.overflowInAmount) : 0) -
+            (spend?.overflowOutAmount ? Number(spend.overflowOutAmount) : 0),
+        );
+        const refill = Math.max(0, target - remaining);
+        jarRefill.push({ jarCode, target, remaining, refill });
       }
 
       const freeCashSpend = latestMonth.spendByJar.find(
@@ -543,10 +546,8 @@ export class BudgetSimulationRunService {
           start: reserveStart,
           refill: reserveRefill,
         },
-        carryOver: {
-          jars: jarsCarryOver,
-          freeCash: freeCashBalance,
-        },
+        jarRefill,
+        freeCash: freeCashBalance,
         structure: {
           flexibleIncome,
         },

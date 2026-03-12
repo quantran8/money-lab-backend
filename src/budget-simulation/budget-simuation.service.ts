@@ -43,8 +43,6 @@ export class BudgetSimulationService {
     allocations: Record<string, number>,
     billReserveOptionCode: string,
     spendModeCode: string,
-    carryOverByJar: Record<string, number> = {},
-    convertToFreeCashByJar: Record<string, number> = {},
   ) {
     return this.runService.startMonth(
       userId,
@@ -52,8 +50,6 @@ export class BudgetSimulationService {
       allocations,
       billReserveOptionCode,
       spendModeCode,
-      carryOverByJar,
-      convertToFreeCashByJar,
     );
   }
 

@@ -38,8 +38,6 @@ export class BudgetController {
             body.allocations,
             body.billReserveOptionCode,
             body.spendModeCode,
-            body.carryOverByJar ?? {},
-            body.convertToFreeCashByJar ?? {},
         );
     }
 
@@ -65,7 +63,7 @@ export class BudgetController {
         return this.budgetService.getActiveBudgetRun(getUserId(req));
     }
 
-    @Post('run/:runId/prepare_next_month')
+    @Post('run/:runId/prepare-next-month')
     prepareNextMonth(@Request() req: { user?: { id: string } }, @Param('runId') runId: string) {
         return this.budgetService.prepareNextMonth(getUserId(req), parseInt(runId));
     }
