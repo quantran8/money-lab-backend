@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Request, UseGuards, Param } from '@nestjs/common';
-import { BudgetSimulationService } from './budget-simuation.service';
+import { BudgetSimulationService } from './budget-simulation.service';
 import {
     StartRunDto,
     StartMonthDto,

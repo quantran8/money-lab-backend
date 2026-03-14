@@ -5,14 +5,31 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { wrapAsync } from '../../common/utils/async.utils';
-import { BudgetMonthQuery } from '../queries/month.query';
-import { BudgetMonthRepository } from '../repositories/month.repository';
-import type { TxClient } from '../repositories/run.repository';
-import { CommitmentQuery } from '../queries/commitment.query';
-import { PrismaService } from '../../prisma/prisma.service';
-import { computeBillsFinal, deterministicRandom, genAutoSpendLabel } from '../budget-simuation.helpers';
-import { JarCode, SpendModeCode } from '../budget-simulation.enum';
+import { wrapAsync } from '@common/utils/async.utils';
+import {
+  BudgetMonthQuery,
+  WeeklyIndexProgressItem,
+  WeeklySpendSummary,
+} from '../queries/month.query';
+import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
+import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
+import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
+import { PrismaService } from '@prisma/prisma.service';
+import {
+  clampHi,
+  clampLqi,
+  computeBillsFinal,
+  deterministicRandom,
+  genAutoSpendLabel,
+  resolveLqiState,
+} from '@app/budget-simulation/budget-simulation.helpers';
+import { JarCode, LqiState, SpendModeCode } from '../budget-simulation.enum';
+import { BudgetSimulationConfigService } from './config.service';
+import {
+  END_OF_MONTH_WEEK,
+  NUMBER_OF_WEEKS_PER_MONTH,
+  TxClient,
+} from '../budget-simulation.constant';
 
 /**
  * Month/week resolution: resolve week, apply event choice, spend jars, finalize bills.
@@ -34,7 +51,9 @@ export class BudgetSimulationMonthService {
     private readonly prisma: PrismaService,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
+    private readonly runRepository: BudgetRunRepository,
     private readonly commitmentQuery: CommitmentQuery,
+    private readonly configService: BudgetSimulationConfigService,
   ) {}
 
   private async getSpendModeRate(code: string): Promise<number> {
@@ -47,44 +66,34 @@ export class BudgetSimulationMonthService {
   private async getJarAvailable(
     monthId: bigint,
     jarCode: string,
+    tx?: TxClient,
   ): Promise<number> {
-    let allocationAmount = 0;
     if (jarCode === 'free_cash') {
-      const month = await this.monthQuery.findMonthById(monthId);
-      allocationAmount = Number(month?.freeCash ?? 0);
-    } else {
-      const allocation =
-        await this.monthQuery.findAllocationByMonthAndJar(monthId, jarCode);
-      allocationAmount = allocation ? Number(allocation.amount) : 0;
+      const month = await this.monthQuery.findMonthById(monthId, tx);
+      return Math.max(0, Number(month?.freeCash ?? 0));
     }
-    const spendByJar =
-      await this.monthQuery.findSpendByJarByMonthAndJar(monthId, jarCode);
-    const spent = spendByJar ? Number(spendByJar.spentAmount) : 0;
-    const overflowIn = spendByJar ? Number(spendByJar.overflowInAmount) : 0;
-    const overflowOut = spendByJar ? Number(spendByJar.overflowOutAmount) : 0;
-    return Math.max(0, allocationAmount - spent + overflowIn - overflowOut);
+    const jar = await this.monthQuery.findJarByMonthAndJar(
+      monthId,
+      jarCode,
+      tx,
+    );
+    if (!jar) return 0;
+    return Math.max(
+      0,
+      Number(jar.allocatedAmount) -
+        Number(jar.spentAmount) +
+        Number(jar.overflowInAmount) -
+        Number(jar.overflowOutAmount),
+    );
   }
 
   private async deductFromJar(
     monthId: bigint,
     jarCode: string,
     amount: number,
+    tx?: TxClient,
   ) {
-    let allocationAmount = 0;
-    if (jarCode === 'free_cash') {
-      const month = await this.monthQuery.findMonthById(monthId);
-      allocationAmount = Number(month?.freeCash ?? 0);
-    } else {
-      const allocation =
-        await this.monthQuery.findAllocationByMonthAndJar(monthId, jarCode);
-      allocationAmount = allocation ? Number(allocation.amount) : 0;
-    }
-    const spendByJar =
-      await this.monthQuery.findSpendByJarByMonthAndJar(monthId, jarCode);
-    const spentSoFar = spendByJar ? Number(spendByJar.spentAmount) : 0;
-    const overflowIn = spendByJar ? Number(spendByJar.overflowInAmount) : 0;
-    const overflowOut = spendByJar ? Number(spendByJar.overflowOutAmount) : 0;
-    const available = allocationAmount - spentSoFar + overflowIn - overflowOut;
+    const available = await this.getJarAvailable(monthId, jarCode, tx);
     const spent = Math.min(Math.max(0, available), amount);
     const jarBalance = available - spent;
     return { spent, jarBalance };
@@ -98,7 +107,7 @@ export class BudgetSimulationMonthService {
     overflowOut: number,
     tx?: TxClient,
   ) {
-    await this.monthRepository.upsertSpendByJar(
+    await this.monthRepository.incrementJarSpend(
       monthId,
       jarCode,
       spent,
@@ -109,20 +118,31 @@ export class BudgetSimulationMonthService {
   }
 
   private async spendJarsForWeek(monthId: bigint, tx?: TxClient) {
-    const month = await this.monthQuery.findMonthById(monthId);
+    const month = await this.monthQuery.findMonthById(monthId, tx);
     if (!month) throw new NotFoundException('Month not found');
     const spendModeCode = month.spendModeCode ?? SpendModeCode.normal;
     const rate = await this.getSpendModeRate(spendModeCode);
     const coreJars = [JarCode.fun, JarCode.learning, JarCode.give];
-    const allocations = await this.monthQuery.findAllocationsForMonth(
-      monthId,
-      coreJars,
-    );
-    const entries: { type: string; jar: string; amount: number; jarBalance: number; label: string }[] = [];
+    const jars = await this.monthQuery.findJarsForMonth(monthId, coreJars, tx);
+    const entries: {
+      type: string;
+      jar: string;
+      amount: number;
+      jarBalance: number;
+      label: string;
+    }[] = [];
 
-    for (const jarEntry of allocations) {
+    const weeklySpend: WeeklySpendSummary = {
+      fun: 0,
+      learning: 0,
+      give: 0,
+    };
+
+    for (const jarEntry of jars) {
       const jar = jarEntry.jarCode;
-      const maxMonthAvailable = Math.round(Number(jarEntry.amount) * rate);
+      const maxMonthAvailable = Math.round(
+        Number(jarEntry.allocatedAmount) * rate,
+      );
       const weeklyAmount = Math.floor(maxMonthAvailable / 4.0);
       if (weeklyAmount <= 0) continue;
 
@@ -130,6 +150,7 @@ export class BudgetSimulationMonthService {
         monthId,
         jar,
         weeklyAmount,
+        tx,
       );
       if (spent > 0) {
         await this.addSpendLog(monthId, jar, spent, 0, 0, tx);
@@ -148,18 +169,28 @@ export class BudgetSimulationMonthService {
           jarBalance,
           label,
         });
+
+        if (jar === JarCode.fun) weeklySpend.fun += spent;
+        if (jar === JarCode.learning) weeklySpend.learning += spent;
+        if (jar === JarCode.give) weeklySpend.give += spent;
       }
     }
-    return { entries };
+
+    return { entries, weeklySpend };
   }
 
-  private async spawnEventForWeek(monthId: bigint, week: number, tx?: TxClient) {
-    const month = await this.monthQuery.findMonthWithRunAndModule(monthId);
+  private async spawnEventForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ) {
+    const month = await this.monthQuery.findMonthWithRunAndModule(monthId, tx);
     if (!month) return null;
 
     const existing = await this.monthQuery.findPendingEventWithTemplate(
       monthId,
       week,
+      tx,
     );
     if (existing) {
       return {
@@ -179,8 +210,26 @@ export class BudgetSimulationMonthService {
       };
     }
 
+    const config = this.configService.getConfig();
+    if (month.stressModeActive) {
+      const maxEvents =
+        config.indexRules.stressMode?.maxEventCountPerMonth ?? 1;
+      const eventCount = await this.monthQuery.countEventsForMonth(monthId, tx);
+      if (eventCount >= maxEvents) return null;
+    }
+
     const seed = `${month.budgetRunId}:${month.monthIndex}:${week}:spawn`;
     if (deterministicRandom(seed) >= 0.5) return null;
+
+    const lqiState =
+      month.indexResolution?.lqiStateEnd ??
+      month.indexResolution?.lqiStateStart ??
+      LqiState.stable;
+    const moduleId = month.budgetRun.moduleId;
+    const weights = await this.monthQuery.findEventPoolWeights(
+      moduleId,
+      lqiState,
+    );
 
     const fromMonth = Math.max(1, month.monthIndex - 5);
     const usedIds = await this.monthQuery.findUsedEventTemplateIds(
@@ -188,15 +237,41 @@ export class BudgetSimulationMonthService {
       fromMonth,
       month.monthIndex,
     );
-    const templates =
-      await this.monthQuery.findLifeEventTemplatesForModule(
-        month.budgetRun.moduleId,
+
+    let templates: Awaited<
+      ReturnType<typeof this.monthQuery.findLifeEventTemplatesForModule>
+    >;
+    if (weights.length > 0) {
+      const totalWeight = weights.reduce((sum, w) => sum + Number(w.weight), 0);
+      const roll =
+        deterministicRandom(
+          `${month.budgetRunId}:${month.monthIndex}:${week}:category`,
+        ) * totalWeight;
+      let running = 0;
+      let chosenCategory = weights[0].eventCategory;
+      for (const w of weights) {
+        running += Number(w.weight);
+        if (roll <= running) {
+          chosenCategory = w.eventCategory;
+          break;
+        }
+      }
+      templates =
+        await this.monthQuery.findLifeEventTemplatesForModuleByCategory(
+          moduleId,
+          chosenCategory,
+          usedIds,
+        );
+    } else {
+      templates = await this.monthQuery.findLifeEventTemplatesForModule(
+        moduleId,
         usedIds,
       );
+    }
     if (templates.length === 0) return null;
 
     const totalWeight = templates.reduce((sum, t) => sum + (11 - t.rarity), 0);
-    const roll =
+    const rollTemplate =
       deterministicRandom(
         `${month.budgetRunId}:${month.monthIndex}:${week}:template`,
       ) * totalWeight;
@@ -204,7 +279,7 @@ export class BudgetSimulationMonthService {
     let selectedTemplate = templates[0];
     for (const t of templates) {
       runningWeight += 11 - t.rarity;
-      if (runningWeight >= roll) {
+      if (runningWeight >= rollTemplate) {
         selectedTemplate = t;
         break;
       }
@@ -233,6 +308,216 @@ export class BudgetSimulationMonthService {
     };
   }
 
+  /** Returns baseline and fun efficiency (0-100) for a LQI state. */
+  private getRecoveryEfficiencyForState(
+    state: 'stable' | 'compressed' | 'strained',
+  ): { baselinePct: number; funPct: number } {
+    const config = this.configService.getConfig();
+    const rep = config.indexRules.recoveryEfficiencyPct;
+    const s = rep?.[state];
+    return {
+      baselinePct: s?.baseline ?? 100,
+      funPct: s?.fun ?? 100,
+    };
+  }
+
+  /**
+   * Computes and persists monthly index resolution (baseline recovery, HI net change, LQI state, etc.)
+   * using module index_rules. Call when month completes (e.g. week 4 no event).
+   */
+  // private async computeAndPersistMonthlyIndexResolution(
+  //   monthIdBig: bigint,
+  //   month: {
+  //     indexResolution: {
+  //       hiStart: number;
+  //       lqiStart: number;
+  //       lqiStateStart: string | null;
+  //     } | null;
+  //   },
+  //   tx?: TxClient,
+  // ): Promise<void> {
+  //   if (!month.indexResolution) return;
+  //   const config = this.configService.getConfig();
+  //   const ir = month.indexResolution;
+  //   const hiStart = Number(ir.hiStart);
+  //   const lqiStart = Number(ir.lqiStart);
+  //   const lqiStateStart =
+  //     (ir.lqiStateStart as 'stable' | 'compressed' | 'strained') ?? 'stable';
+
+  //   const { healthDeltaTotal, lqiDeltaTotal } =
+  //     await this.monthQuery.getChosenEventsHealthAndLqiTotals(monthIdBig);
+  //   const { baselinePct, funPct } =
+  //     this.getRecoveryEfficiencyForState(lqiStateStart);
+
+  //   const baselineHiRecovery = config.indexRules.baselineHiRecovery ?? 10;
+  //   const baselineRecovery = Math.round(
+  //     baselineHiRecovery * (baselinePct / 100),
+  //   );
+  //   const funBonusRaw = 2;
+  //   const funRecoveryBonus = Math.round(funBonusRaw * (funPct / 100));
+  //   const jobDrain = 0;
+  //   const stressEffect = 0;
+  //   const hiNetChange =
+  //     baselineRecovery +
+  //     funRecoveryBonus -
+  //     jobDrain +
+  //     healthDeltaTotal -
+  //     stressEffect;
+  //   const rawHiEnd = hiStart + hiNetChange;
+  //   const hiEnd = clampHi(rawHiEnd, config);
+  //   const rawLqiEnd = lqiStart + lqiDeltaTotal;
+  //   const lqiEnd = clampLqi(rawLqiEnd, config);
+  //   const lqiStateEnd = resolveLqiState(lqiEnd, config);
+
+  //   await this.monthRepository.updateIndexResolution(
+  //     monthIdBig,
+  //     {
+  //       baselineRecovery,
+  //       funRecoveryBonus,
+  //       jobDrain,
+  //       eventHiEffectTotal: healthDeltaTotal,
+  //       stressEffect,
+  //       hiNetChange,
+  //       hiEnd,
+  //       lqiEnd,
+  //       lqiStateEnd,
+  //       baselineRecoveryEfficiencyPct: baselinePct,
+  //       funRecoveryEfficiencyPct: funPct,
+  //       eventPoolBiasState: lqiStateEnd,
+  //     },
+  //     tx,
+  //   );
+  // }
+
+  private async computeAndPersistWeeklyIndexResolution(
+    monthIdBig: bigint,
+    week: number,
+    weeklySpend: WeeklySpendSummary,
+    forcedRestNotice: { incomeLoss: number; hiRecovery: number } | null,
+    tx?: TxClient,
+  ): Promise<void> {
+    const month = await this.monthQuery.findMonthWithRunAndJobLevel(
+      monthIdBig,
+      tx,
+    );
+    if (!month?.indexResolution) return;
+
+    const config = this.configService.getConfig();
+    const ir = month.indexResolution;
+
+    const hiStart = Number(ir.hiEnd ?? ir.hiStart ?? 50);
+    const lqiStart = Number(ir.lqiEnd ?? ir.lqiStart ?? 50);
+
+    const lqiStateStart = resolveLqiState(lqiStart, config) as
+      | 'stable'
+      | 'compressed'
+      | 'strained';
+
+    const { baselinePct, funPct } =
+      this.getRecoveryEfficiencyForState(lqiStateStart);
+
+    // Weekly baseline recovery
+    const weeklyBaselineRecovery = Math.round(
+      (config.indexRules.baselineHiRecovery ?? 10) / NUMBER_OF_WEEKS_PER_MONTH,
+    );
+
+    // Weekly job drain:
+    // simplest version = distribute monthly drain evenly
+    // replace this with job-level based energy load lookup if available
+    const monthlyJobDrain =
+      Number(month.budgetRun?.jobState?.job?.baseEnergyLoad ?? 0) || 0;
+    const weeklyJobDrain = Math.round(monthlyJobDrain / 4);
+
+    // Weekly event totals
+    const { healthDeltaTotal, lqiDeltaTotal } =
+      await this.monthQuery.getChosenEventsHealthAndLqiTotalsForWeek(
+        monthIdBig,
+        week,
+        tx,
+      );
+
+    // Weekly fun recovery bonus
+    let funBonusRaw = 0;
+    if (weeklySpend.fun >= 75) funBonusRaw = 1;
+    else if (weeklySpend.fun >= 25) funBonusRaw = 0.5;
+
+    const weeklyFunRecoveryBonus = Math.round(funBonusRaw * (funPct / 100));
+
+    const stressEffect = 0;
+
+    const forcedRestRecovery = forcedRestNotice?.hiRecovery ?? 0;
+
+    const hiNetChange =
+      weeklyBaselineRecovery +
+      weeklyFunRecoveryBonus -
+      weeklyJobDrain +
+      healthDeltaTotal -
+      stressEffect +
+      forcedRestRecovery;
+
+    const lqiNetChange = lqiDeltaTotal;
+
+    const hiEnd = clampHi(hiStart + hiNetChange, config);
+    const lqiEnd = clampLqi(lqiStart + lqiNetChange, config);
+    const lqiStateEnd = resolveLqiState(lqiEnd, config);
+
+    const weeklyPayload: WeeklyIndexProgressItem = {
+      hiStart,
+      hiEnd,
+      hiNetChange,
+      lqiStart,
+      lqiEnd,
+      lqiNetChange,
+      lqiStateStart,
+      lqiStateEnd,
+      baselineRecovery: weeklyBaselineRecovery,
+      funRecoveryBonus: weeklyFunRecoveryBonus,
+      jobDrain: weeklyJobDrain,
+      eventHiEffectTotal: healthDeltaTotal,
+      eventLqiEffectTotal: lqiDeltaTotal,
+      stressEffect,
+      baselineRecoveryEfficiencyPct: baselinePct,
+      funRecoveryEfficiencyPct: funPct,
+      forcedRestTriggered: !!forcedRestNotice,
+      incomeLossFromForcedRest: forcedRestNotice?.incomeLoss ?? 0,
+      hiRecoveryFromForcedRest: forcedRestNotice?.hiRecovery ?? 0,
+    };
+
+    const currentProgress =
+      (ir.weeklyIndexProgress as Record<
+        string,
+        WeeklyIndexProgressItem
+      > | null) ?? {};
+
+    const nextProgress = {
+      ...currentProgress,
+      [`week${week}`]: weeklyPayload,
+    };
+
+    await this.monthRepository.updateIndexResolution(
+      monthIdBig,
+      {
+        hiEnd,
+        lqiEnd,
+        lqiStateEnd,
+        baselineRecovery: weeklyBaselineRecovery,
+        funRecoveryBonus: weeklyFunRecoveryBonus,
+        jobDrain: weeklyJobDrain,
+        eventHiEffectTotal: Object.values(nextProgress).reduce(
+          (sum, x) => sum + Number(x.eventHiEffectTotal ?? 0),
+          0,
+        ),
+        stressEffect,
+        hiNetChange: hiEnd - Number(ir.hiStart),
+        baselineRecoveryEfficiencyPct: baselinePct,
+        funRecoveryEfficiencyPct: funPct,
+        eventPoolBiasState: lqiStateEnd,
+        weeklyIndexProgress: nextProgress,
+      },
+      tx,
+    );
+  }
+
   private async finalizeBills(
     runId: number,
     monthIndex: number,
@@ -248,15 +533,16 @@ export class BudgetSimulationMonthService {
     tx?: TxClient,
   ) {
     const monthIdBig = BigInt(monthId);
-    const month = await this.monthQuery.findMonthWithRun(monthIdBig);
+    const month = await this.monthQuery.findMonthWithRun(monthIdBig, tx);
 
     if (!month || month.budgetRun.userId !== userId)
       throw new ForbiddenException('Forbidden');
-    if (month.currentWeek < 4)
+    if (month.currentWeek < END_OF_MONTH_WEEK)
       throw new BadRequestException('Cannot finalize bills before week 4');
 
     const delta = actual - month.billsEstimated;
     const breakdown: Record<string, number> = {};
+    const billReserveEnd = month.billResolution?.billReserveEnd ?? 0;
 
     if (delta <= 0) {
       const surplus = Math.abs(delta);
@@ -264,21 +550,26 @@ export class BudgetSimulationMonthService {
       breakdown['surplusToFreeCash'] = surplus;
       await this.monthRepository.updateMonth(
         monthIdBig,
+        { billsActual: actual, freeCash: { increment: surplus } },
+        tx,
+      );
+      await this.monthRepository.updateBillResolution(
+        monthIdBig,
         {
-          billsActual: actual,
           billReconcileBreakdown: breakdown,
-          freeCash: { increment: surplus },
+          surplusToFreeCash: surplus,
         },
         tx,
       );
     } else {
       let rem = delta;
-      const takenReserve = Math.min(month.billReserveEnd, rem);
+      const takenReserve = Math.min(billReserveEnd, rem);
       rem -= takenReserve;
       breakdown['billReserve'] = takenReserve;
-      await this.monthRepository.updateMonth(
+      const billReserveEndAfter = billReserveEnd - takenReserve;
+      await this.monthRepository.updateBillResolution(
         monthIdBig,
-        { billReserveEnd: month.billReserveEnd - takenReserve },
+        { billReserveEnd: billReserveEndAfter },
         tx,
       );
 
@@ -286,7 +577,7 @@ export class BudgetSimulationMonthService {
       let freeCashDeficit = 0;
       for (const jar of jarOrder) {
         if (rem <= 0) break;
-        const { spent } = await this.deductFromJar(monthIdBig, jar, rem);
+        const { spent } = await this.deductFromJar(monthIdBig, jar, rem, tx);
         if (spent > 0) {
           if (jar === 'free_cash') {
             freeCashDeficit = spent;
@@ -302,13 +593,20 @@ export class BudgetSimulationMonthService {
         monthIdBig,
         {
           billsActual: actual,
+          structuralOvercommitmentOccurred: rem > 0,
+          freeCash: { decrement: freeCashDeficit },
+        },
+        tx,
+      );
+      await this.monthRepository.updateBillResolution(
+        monthIdBig,
+        {
           billReconcileBreakdown: {
             ...breakdown,
             billsDelta: delta,
             uncovered: rem,
           },
-          structuralOvercommitmentOccurred: rem > 0,
-          freeCash: { decrement: freeCashDeficit },
+          shortfallTotal: rem > 0 ? rem : 0,
         },
         tx,
       );
@@ -319,7 +617,8 @@ export class BudgetSimulationMonthService {
   async resolveWeek(userId: string, monthId: number) {
     return wrapAsync(this.logger, 'resolveWeek', async () => {
       const monthIdBig = BigInt(monthId);
-      const month = await this.monthQuery.findMonthWithRun(monthIdBig);
+      const month =
+        await this.monthQuery.findMonthWithRunAndJobLevel(monthIdBig);
 
       if (!month || month.budgetRun.userId !== userId)
         throw new ForbiddenException('Forbidden or Month not found');
@@ -341,25 +640,89 @@ export class BudgetSimulationMonthService {
       let futureTotal = month.cumulativeFutureYou;
       let freeCashBalance = month.freeCash;
       const spendingSummary: Record<string, number> = {};
-      let futureRemainInMonth = 0;
 
+      type ForcedRestNotice = { incomeLoss: number; hiRecovery: number };
       type ResolveTxResult = readonly [
-        { type: string; jar: string; amount: number; jarBalance: number; label: string }[],
+        {
+          type: string;
+          jar: string;
+          amount: number;
+          jarBalance: number;
+          label: string;
+        }[],
         unknown,
         { actual: number } | null,
+        ForcedRestNotice | null,
       ];
-      const [entries, eventPending, billsFromTx] = await this.prisma.$transaction(
-        async (tx) => {
+      const config = this.configService.getConfig();
+      const maxForcedRest =
+        config.indexRules.stressMode?.maxForcedRestPerMonth ?? 1;
+      const hiRecoveryFromForcedRest = 5;
+
+      const [entries, eventPending, billsFromTx, forcedRestNotice] =
+        await this.prisma.$transaction(async (tx) => {
           await this.monthRepository.updateMonth(
             monthIdBig,
             { currentWeek: nextWeek },
             tx,
           );
 
-          const spendResult = await this.spendJarsForWeek(monthIdBig, tx);
-          const event = await this.spawnEventForWeek(monthIdBig, nextWeek, tx);
+          let didForcedRest = false;
+          let incomeLossFromForcedRest = 0;
 
-          if (nextWeek === 4 && !event) {
+          const idx = month.indexResolution;
+          const currentHi = idx ? Number(idx.hiEnd ?? idx.hiStart ?? 50) : 50;
+          if (
+            idx &&
+            idx.forcedRestWeek == null &&
+            currentHi < config.indexRules.hiFloor &&
+            maxForcedRest >= 1
+          ) {
+            const jobState = month.budgetRun.jobState;
+            const levels = jobState?.job?.levels ?? [];
+            const levelRow =
+              levels.find((l) => l.level === jobState?.level) ?? levels[0];
+            incomeLossFromForcedRest =
+              levelRow?.absenceDeductionPerDay != null
+                ? Number(levelRow.absenceDeductionPerDay)
+                : 0;
+
+            await this.monthRepository.updateIndexResolution(
+              monthIdBig,
+              {
+                forcedRestWeek: nextWeek,
+                incomeLossFromForcedRest,
+                hiRecoveryFromForcedRest: hiRecoveryFromForcedRest,
+              },
+              tx,
+            );
+            didForcedRest = true;
+          }
+
+          const spendResult = await this.spendJarsForWeek(monthIdBig, tx);
+          const event = didForcedRest
+            ? null
+            : await this.spawnEventForWeek(monthIdBig, nextWeek, tx);
+
+          const forcedRestPayload = didForcedRest
+            ? {
+                incomeLoss: incomeLossFromForcedRest,
+                hiRecovery: hiRecoveryFromForcedRest,
+              }
+            : null;
+
+          // Resolve weekly index immediately if no event is waiting for user choice
+          if (!event) {
+            await this.computeAndPersistWeeklyIndexResolution(
+              monthIdBig,
+              nextWeek,
+              spendResult.weeklySpend,
+              forcedRestPayload,
+              tx,
+            );
+          }
+
+          if (nextWeek === END_OF_MONTH_WEEK && !event) {
             const billResult = await this.finalizeBills(
               Number(month.budgetRunId),
               month.monthIndex,
@@ -372,65 +735,103 @@ export class BudgetSimulationMonthService {
               tx,
             );
 
-            const futureYouAllocation =
-              await this.monthQuery.findAllocationByMonthAndJar(
-                monthIdBig,
-                JarCode.futureYou,
-              );
-            const futureYouSpending =
-              await this.monthQuery.findSpendByJarByMonthAndJar(
-                monthIdBig,
-                JarCode.futureYou,
-              );
-
+            const futureYouJar = await this.monthQuery.findJarByMonthAndJar(
+              monthIdBig,
+              JarCode.futureYou,
+              tx,
+            );
             let remain = 0;
-            if (futureYouAllocation) {
+            if (futureYouJar) {
               remain =
-                Number(futureYouAllocation.amount) -
-                (futureYouSpending?.spentAmount
-                  ? Number(futureYouSpending.spentAmount)
-                  : 0);
+                Number(futureYouJar.allocatedAmount) -
+                Number(futureYouJar.spentAmount) +
+                Number(futureYouJar.overflowInAmount) -
+                Number(futureYouJar.overflowOutAmount);
             }
 
             await this.monthRepository.updateMonth(
               monthIdBig,
               {
                 currentWeek: 5,
-                healthIndexEnd: month.healthIndexEnd,
-                lqiEnd: month.lqiEnd,
                 cumulativeFutureYou: { increment: remain },
               },
               tx,
             );
 
-            return [spendResult.entries, event, billResult] as ResolveTxResult;
+            return [
+              spendResult.entries,
+              event,
+              billResult,
+              forcedRestPayload,
+            ] as ResolveTxResult;
           }
 
-          return [spendResult.entries, event, null] as ResolveTxResult;
-        },
-      );
+          return [
+            spendResult.entries,
+            event,
+            null,
+            forcedRestPayload,
+          ] as ResolveTxResult;
+        });
 
-      if (nextWeek === 4 && !eventPending) {
+      let hiAfter: number;
+      let lqiAfter: number;
+
+      const refreshedMonth =
+        await this.monthQuery.findMonthWithJars(monthIdBig);
+
+      if (nextWeek === END_OF_MONTH_WEEK && !eventPending) {
         monthComplete = true;
         bills = billsFromTx ?? null;
-        const updatedMonth = await this.monthQuery.findMonthWithSpendByJar(
-          monthIdBig,
-        );
-        futureTotal = updatedMonth?.cumulativeFutureYou ?? futureTotal;
-        freeCashBalance = updatedMonth?.freeCash ?? freeCashBalance;
-        if (updatedMonth) {
-          for (const s of updatedMonth.spendByJar) {
-            spendingSummary[s.jarCode] = Number(s.spentAmount);
-          }
+        futureTotal = refreshedMonth?.cumulativeFutureYou ?? futureTotal;
+        freeCashBalance = refreshedMonth?.freeCash ?? freeCashBalance;
+      }
+
+      if (refreshedMonth) {
+        for (const j of refreshedMonth.jars) {
+          spendingSummary[j.jarCode] = Number(j.spentAmount);
         }
       }
+
+      hiAfter = clampHi(
+        Number(
+          refreshedMonth?.indexResolution?.hiEnd ??
+            refreshedMonth?.indexResolution?.hiStart ??
+            50,
+        ),
+        config,
+      );
+
+      lqiAfter = clampLqi(
+        Number(
+          refreshedMonth?.indexResolution?.lqiEnd ??
+            refreshedMonth?.indexResolution?.lqiStart ??
+            50,
+        ),
+        config,
+      );
+
+      const systemNotice =
+        forcedRestNotice != null
+          ? {
+              type: 'forced_rest' as const,
+              title: 'Forced Rest',
+              message:
+                'HI quá thấp. Bạn phải nghỉ 1 ngày, một ca làm bị hủy (không lương).',
+              week: nextWeek,
+              effects: {
+                incomeLoss: forcedRestNotice.incomeLoss,
+                hiRecovery: forcedRestNotice.hiRecovery,
+              },
+            }
+          : null;
 
       return {
         week: nextWeek,
         entries,
-        hiAfter: month.healthIndexEnd,
-        lqiAfter: month.lqiEnd,
-        systemNotice: null,
+        hiAfter,
+        lqiAfter,
+        systemNotice,
         eventPending: eventPending,
         monthComplete,
         bills,
@@ -482,14 +883,10 @@ export class BudgetSimulationMonthService {
         );
       }
 
-      let hi = month.healthIndexEnd ?? 0;
-      let lqi = month.lqiEnd ?? 0;
-      hi = Math.max(0, Math.min(100, hi + (option.healthDelta ?? 0)));
-      lqi = Math.max(0, Math.min(100, lqi + (option.lqiDelta ?? 0)));
-
       const moneyDelta = option.moneyDelta ?? 0;
       const cost = moneyDelta < 0 ? Math.abs(moneyDelta) : 0;
       const paymentRecord: { jar: string; amount: number }[] = [];
+      const learningXpDelta = option.learningXpDelta ?? 0;
 
       if (cost > 0) {
         const primaryAvailable = await this.getJarAvailable(
@@ -523,22 +920,16 @@ export class BudgetSimulationMonthService {
       }
 
       let futureRemainInMonth = 0;
-      const futureYouAllocation =
-        await this.monthQuery.findAllocationByMonthAndJar(
-          monthIdBig,
-          JarCode.futureYou,
-        );
-      const futureYouSpending =
-        await this.monthQuery.findSpendByJarByMonthAndJar(
-          monthIdBig,
-          JarCode.futureYou,
-        );
-      if (futureYouAllocation) {
+      const futureYouJar = await this.monthQuery.findJarByMonthAndJar(
+        monthIdBig,
+        JarCode.futureYou,
+      );
+      if (futureYouJar) {
         futureRemainInMonth =
-          Number(futureYouAllocation.amount) -
-          (futureYouSpending?.spentAmount
-            ? Number(futureYouSpending.spentAmount)
-            : 0);
+          Number(futureYouJar.allocatedAmount) -
+          Number(futureYouJar.spentAmount) +
+          Number(futureYouJar.overflowInAmount) -
+          Number(futureYouJar.overflowOutAmount);
       }
 
       let bills: { actual: number } | null = null;
@@ -547,12 +938,6 @@ export class BudgetSimulationMonthService {
       const spendSummary: Record<string, number> = {};
 
       await this.prisma.$transaction(async (tx) => {
-        await this.monthRepository.updateMonth(
-          monthIdBig,
-          { healthIndexEnd: hi, lqiEnd: lqi },
-          tx,
-        );
-
         if (cost > 0) {
           for (const { jar, amount } of paymentRecord) {
             if (jar === 'free_cash') {
@@ -593,7 +978,23 @@ export class BudgetSimulationMonthService {
           tx,
         );
 
-        if (week === 4) {
+        if (learningXpDelta !== 0 && month.budgetRun.jobStateId != null) {
+          await this.runRepository.updateUserJobState(
+            month.budgetRun.jobStateId,
+            { xp: { increment: learningXpDelta } },
+            tx,
+          );
+        }
+
+        await this.computeAndPersistWeeklyIndexResolution(
+          monthIdBig,
+          week,
+          { fun: 0, learning: 0, give: 0 },
+          null,
+          tx,
+        );
+
+        if (week === END_OF_MONTH_WEEK) {
           const billResult = await this.finalizeBills(
             Number(month.budgetRunId),
             month.monthIndex,
@@ -618,14 +1019,35 @@ export class BudgetSimulationMonthService {
         }
       });
 
-      if (week === 4) {
-        const updatedMonth = await this.monthQuery.findMonthWithSpendByJar(
-          monthIdBig,
-        );
+      const config = this.configService.getConfig();
+      const refreshedMonth =
+        await this.monthQuery.findMonthWithJars(monthIdBig);
+
+      const hiAfter = clampHi(
+        Number(
+          refreshedMonth?.indexResolution?.hiEnd ??
+            refreshedMonth?.indexResolution?.hiStart ??
+            50,
+        ),
+        config,
+      );
+
+      const lqiAfter = clampLqi(
+        Number(
+          refreshedMonth?.indexResolution?.lqiEnd ??
+            refreshedMonth?.indexResolution?.lqiStart ??
+            50,
+        ),
+        config,
+      );
+
+      if (week === END_OF_MONTH_WEEK) {
+        const updatedMonth =
+          await this.monthQuery.findMonthWithJars(monthIdBig);
         futureTotal = updatedMonth?.cumulativeFutureYou ?? 0;
         if (updatedMonth) {
-          for (const s of updatedMonth.spendByJar) {
-            spendSummary[s.jarCode] = Number(s.spentAmount);
+          for (const j of updatedMonth.jars) {
+            spendSummary[j.jarCode] = Number(j.spentAmount);
           }
         }
       }
@@ -635,11 +1057,12 @@ export class BudgetSimulationMonthService {
         optionLabel: option.optionLabel,
         healthDelta: option.healthDelta,
         lqiDelta: option.lqiDelta,
+        learningXpDelta: option.learningXpDelta,
         moneyDelta: option.moneyDelta,
         defaultJarCode: option.moneyJarCode ?? undefined,
         paymentRecord: paymentRecord,
-        hiAfter: hi,
-        lqiAfter: lqi,
+        hiAfter,
+        lqiAfter,
         monthComplete: monthComplete,
         bills,
         futureYouTotal: futureTotal,

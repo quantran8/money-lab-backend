@@ -5,7 +5,7 @@ import { SupabaseService } from './supabase/supabase.service';
 import { PrismaService } from './prisma/prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { LearnModule } from './learn/learn.module';
-import { BudgetModule } from './budget-simulation/budget-simuation.module';
+import { BudgetModule } from './budget-simulation/budget-simulation.module';
 
 @Global()
 @Module({

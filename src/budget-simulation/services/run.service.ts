@@ -5,15 +5,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { wrapAsync } from '../../common/utils/async.utils';
+import { wrapAsync } from '@common/utils/async.utils';
 import { BudgetRunQuery } from '../queries/run.query';
-import { BudgetRunRepository } from '../repositories/run.repository';
+import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
 import { BudgetMonthQuery } from '../queries/month.query';
 import { BudgetMonthRepository } from '../repositories/month.repository';
 import { CommitmentQuery } from '../queries/commitment.query';
 import { BillReserveOptionCode, CommitmentLayer, JarCode } from '../budget-simulation.enum';
-import { PrismaService } from '../../prisma/prisma.service';
-import type { TxClient } from '../repositories/run.repository';
+import { PrismaService } from '@app/prisma/prisma.service';
+import { resolveLqiState } from '../budget-simulation.helpers';
+import { BudgetSimulationConfigService } from './config.service';
+import { TxClient } from '../budget-simulation.constant';
 
 /**
  * Run lifecycle: active run, start run, start month, prepare next month.
@@ -30,6 +32,7 @@ export class BudgetSimulationRunService {
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
     private readonly commitmentQuery: CommitmentQuery,
+    private readonly configService: BudgetSimulationConfigService,
   ) {}
 
   private async getBillReserveCoveragePct(code: string): Promise<number> {
@@ -49,10 +52,10 @@ export class BudgetSimulationRunService {
     const coreJars = ['fun', 'learning', 'give', 'future_you'];
     for (const [jarCode, amount] of Object.entries(allocations)) {
       if (jarCode === 'free_cash') continue;
-      await this.monthRepository.upsertAllocation(monthId, jarCode, amount, tx);
+      await this.monthRepository.upsertJar(monthId, jarCode, amount, tx);
     }
     for (const jarCode of coreJars) {
-      await this.monthRepository.ensureAllocationExists(monthId, jarCode, tx);
+      await this.monthRepository.ensureJarExists(monthId, jarCode, tx);
     }
   }
 
@@ -86,24 +89,24 @@ export class BudgetSimulationRunService {
       });
 
       const latestMonth = run.months[0];
-      const jarsAllocationArr =
-        latestMonth?.allocations.filter((a) => a.jarCode !== 'free_cash') ?? [];
-      const spendByJarArr = latestMonth?.spendByJar ?? [];
+      const jarsArr =
+        latestMonth?.jars.filter((j) => j.jarCode !== 'free_cash') ?? [];
 
       const freeCashAlloc = latestMonth?.freeCash ?? 0;
-      const freeCashSpend = spendByJarArr.find(
-        (s) => s.jarCode === 'free_cash',
+      const freeCashJar = latestMonth?.jars.find(
+        (j) => j.jarCode === 'free_cash',
       );
-      const freeCashBalance =
-        freeCashAlloc -
-        (freeCashSpend?.spentAmount ?? 0) +
-        (freeCashSpend?.overflowInAmount ?? 0) -
-        (freeCashSpend?.overflowOutAmount ?? 0);
+      const freeCashBalance = freeCashJar
+        ? Number(freeCashJar.allocatedAmount) -
+          Number(freeCashJar.spentAmount) +
+          Number(freeCashJar.overflowInAmount) -
+          Number(freeCashJar.overflowOutAmount)
+        : freeCashAlloc;
 
       const necessitiesTotal =
         (latestMonth?.lockedCommitmentsTotal ?? 0) +
         (latestMonth?.billsEstimated ?? 0) +
-        (latestMonth?.billReserveTarget ?? 0);
+        (latestMonth?.billResolution?.billReserveTarget ?? 0);
 
       return {
         id: run.id.toString(),
@@ -126,15 +129,16 @@ export class BudgetSimulationRunService {
           })),
           ...billEstimatedTemplates,
         ],
-        jars: jarsAllocationArr.reduce(
+        jars: jarsArr.reduce(
           (acc, curr) => {
-            const spent = spendByJarArr.find((s) => s.jarCode === curr.jarCode);
-            const spentAmount = spent?.spentAmount ?? 0;
-            const overflowIn = spent?.overflowInAmount ?? 0;
-            const overflowOut = spent?.overflowOutAmount ?? 0;
+            const balance =
+              Number(curr.allocatedAmount) -
+              Number(curr.spentAmount) +
+              Number(curr.overflowInAmount) -
+              Number(curr.overflowOutAmount);
             acc[curr.jarCode] = {
-              allocation: curr.amount,
-              balance: curr.amount - spentAmount + overflowIn - overflowOut,
+              allocation: Number(curr.allocatedAmount),
+              balance,
             };
             return acc;
           },
@@ -249,26 +253,20 @@ export class BudgetSimulationRunService {
       if (prevMonth) {
         prevMonthFreeCashBalance = Math.max(0, Number(prevMonth.freeCash ?? 0));
 
-        const prevAllocs = await this.monthQuery.findAllocationsForMonth(
+        const prevJars = await this.monthQuery.findJarsForMonth(
           prevMonth.id,
           coreJars,
         );
-        const prevSpendByJar = await this.monthQuery.findSpendByJarForMonth(
-          prevMonth.id,
-          coreJars,
-        );
-
         const allocByJar = Object.fromEntries(
-          prevAllocs.map((a) => [a.jarCode, Number(a.amount)]),
+          prevJars.map((j) => [j.jarCode, Number(j.allocatedAmount)]),
         );
-
         const spendByJar = Object.fromEntries(
-          prevSpendByJar.map((s) => [
-            s.jarCode,
+          prevJars.map((j) => [
+            j.jarCode,
             {
-              spent: Number(s.spentAmount),
-              overflowIn: Number(s.overflowInAmount),
-              overflowOut: Number(s.overflowOutAmount),
+              spent: Number(j.spentAmount),
+              overflowIn: Number(j.overflowInAmount),
+              overflowOut: Number(j.overflowOutAmount),
             },
           ]),
         );
@@ -293,10 +291,16 @@ export class BudgetSimulationRunService {
       }
 
       const monthIndex = (prevMonth?.monthIndex ?? 0) + 1;
-      const hiStart = prevMonth?.healthIndexEnd ?? 70;
-      const lqiStart = prevMonth?.lqiEnd ?? 40;
+      const hiStart =
+        prevMonth?.indexResolution?.hiEnd ??
+        prevMonth?.indexResolution?.hiStart ??
+        70;
+      const lqiStart =
+        prevMonth?.indexResolution?.lqiEnd ??
+        prevMonth?.indexResolution?.lqiStart ??
+        70;
       const stress = prevMonth?.structuralOvercommitmentOccurred ?? false;
-      const billReserveStart = prevMonth?.billReserveEnd ?? 0;
+      const billReserveStart = prevMonth?.billResolution?.billReserveEnd ?? 0;
 
       const commitments =
         await this.runQuery.findCommitmentsForRunWithTemplates(BigInt(runId));
@@ -367,21 +371,35 @@ export class BudgetSimulationRunService {
             billsEstimated,
             billsActual: 0,
             billReserveOptionCode,
-            billReserveTarget,
-            billReserveStart,
-            billReserveEnd,
             spendModeCode,
-            healthIndexStart: hiStart,
-            healthIndexEnd: hiStart,
-            lqiStart: lqiStart,
-            lqiEnd: lqiStart,
             cumulativeFutureYou: prevMonth?.cumulativeFutureYou ?? 0,
             freeCash: cumulativeFreeCash,
             currentWeek: 0,
             stressModeActive: stress,
-            overtimeUnits: 0,
-            overtimeIncome: 0,
-            overtimeHealthCost: 0,
+          },
+          tx,
+        );
+
+        await this.monthRepository.createBillResolution(
+          {
+            budgetMonthId: month.id,
+            billReserveTarget,
+            billReserveStart,
+            billReserveEnd,
+          },
+          tx,
+        );
+        const config = this.configService.getConfig();
+        const lqiStateStart = resolveLqiState(lqiStart, config);
+        await this.monthRepository.createIndexResolution(
+          {
+            budgetMonthId: month.id,
+            hiStart,
+            hiEnd: hiStart,
+            lqiStart,
+            lqiEnd: lqiStart,
+            lqiStateStart,
+            lqiStateEnd: lqiStateStart,
           },
           tx,
         );
@@ -443,8 +461,10 @@ export class BudgetSimulationRunService {
         currentLevel?.overtimeIncomePerUnit ??
         jobState.job.overtimeIncomePerUnit;
 
-      const overtimePay = latestMonth.overtimeUnits * otPayPerUnit;
-      const absenceDeduction = latestMonth.incomeLossFromForcedRest;
+      const overtimeUnits = 0;
+      const overtimePay = overtimeUnits * Number(otPayPerUnit ?? 0);
+      const absenceDeduction =
+        latestMonth.indexResolution?.incomeLossFromForcedRest ?? 0;
       const finalIncome = baseIncome + overtimePay - absenceDeduction;
 
       const lockedTotal = run.commitments
@@ -478,7 +498,7 @@ export class BudgetSimulationRunService {
         latestMonth.billReserveOptionCode || BillReserveOptionCode.high;
       const covPct = await this.getBillReserveCoveragePct(optionCode);
       const reserveTarget = Math.round((covPct / 100) * estimatedBills);
-      const reserveStart = latestMonth.billReserveEnd;
+      const reserveStart = latestMonth.billResolution?.billReserveEnd ?? 0;
       const reserveRefill = Math.max(0, reserveTarget - reserveStart);
 
       const jarOrder = [
@@ -496,33 +516,33 @@ export class BudgetSimulationRunService {
       }> = [];
 
       for (const jarCode of jarOrder) {
-        const target =
-          Number(
-            latestMonth.allocations.find((a) => a.jarCode === jarCode)?.amount ??
+        const jar = latestMonth.jars.find((j) => j.jarCode === jarCode);
+        const target = jar ? Number(jar.allocatedAmount) : 0;
+        const remaining = jar
+          ? Math.max(
               0,
-          );
-        const spend = latestMonth.spendByJar.find((s) => s.jarCode === jarCode);
-        const remaining = Math.max(
-          0,
-          target -
-            (spend?.spentAmount ? Number(spend.spentAmount) : 0) +
-            (spend?.overflowInAmount ? Number(spend.overflowInAmount) : 0) -
-            (spend?.overflowOutAmount ? Number(spend.overflowOutAmount) : 0),
-        );
+              target -
+                Number(jar.spentAmount) +
+                Number(jar.overflowInAmount) -
+                Number(jar.overflowOutAmount),
+            )
+          : 0;
         const refill = Math.max(0, target - remaining);
         jarRefill.push({ jarCode, target, remaining, refill });
       }
 
-      const freeCashSpend = latestMonth.spendByJar.find(
-        (s) => s.jarCode === 'free_cash',
+      const freeCashJar = latestMonth.jars.find(
+        (j) => j.jarCode === 'free_cash',
       );
-      const freeCashBalance = Math.max(
-        0,
-        latestMonth.freeCash -
-          (freeCashSpend?.spentAmount ?? 0) +
-          (freeCashSpend?.overflowInAmount ?? 0) -
-          (freeCashSpend?.overflowOutAmount ?? 0),
-      );
+      const freeCashBalance = freeCashJar
+        ? Math.max(
+            0,
+            Number(freeCashJar.allocatedAmount) -
+              Number(freeCashJar.spentAmount) +
+              Number(freeCashJar.overflowInAmount) -
+              Number(freeCashJar.overflowOutAmount),
+          )
+        : Math.max(0, Number(latestMonth.freeCash));
 
       const flexibleIncome =
         finalIncome - lockedTotal - estimatedBills - reserveRefill;

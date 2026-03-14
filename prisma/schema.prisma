@@ -25,16 +25,18 @@ model Profile {
 }
 
 model Module {
-  id                  Int                  @id @default(autoincrement()) @db.SmallInt
-  code                String               @unique
-  title               String
-  description         String?
-  sortOrder           Int                  @default(0) @map("sort_order") @db.SmallInt
-  budgetRuns          BudgetRun[]
-  commitmentTemplates CommitmentTemplate[]
-  lessons             Lesson[]
-  lifeEventTemplates  LifeEventTemplate[]
-  userProgresses      UserModuleProgress[]
+  id                   Int                       @id @default(autoincrement()) @db.SmallInt
+  code                 String                    @unique
+  title                String
+  description          String?
+  sortOrder            Int                       @default(0) @map("sort_order") @db.SmallInt
+  config               Json?                     @default("{}") @db.JsonB
+  budgetRuns           BudgetRun[]
+  commitmentTemplates  CommitmentTemplate[]
+  lessons              Lesson[]
+  lifeEventTemplates   LifeEventTemplate[]
+  userProgresses       UserModuleProgress[]
+  eventPoolWeights     ModuleEventPoolWeight[]
 
   @@map("modules")
   @@schema("public")
@@ -56,6 +58,19 @@ model UserModuleProgress {
   @@unique([userId, moduleId])
   @@index([userId], map: "idx_ump_user")
   @@map("user_module_progress")
+  @@schema("public")
+}
+
+model ModuleEventPoolWeight {
+  id             BigInt   @id @default(autoincrement())
+  moduleId       Int      @map("module_id") @db.SmallInt
+  lqiState       String   @map("lqi_state")
+  eventCategory  String   @map("event_category")
+  weight         Decimal  @db.Decimal(5, 4)
+  module         Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([moduleId], map: "idx_module_event_pool_weights_module")
+  @@map("module_event_pool_weights")
   @@schema("public")
 }
 
@@ -94,6 +109,7 @@ model JobLevel {
   xpRequiredTotal        Int      @default(0) @map("xp_required_total")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   baseEnergyLoadOverride Int      @map("base_energy_load_override")
+  absenceDeductionPerDay Int?     @map("absence_deduction_per_day")
   job                    Job      @relation(fields: [jobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([jobId, level])
@@ -228,39 +244,26 @@ model SpendModeOption {
 }
 
 model BudgetRunMonth {
-  id                               BigInt                  @id @default(autoincrement())
-  budgetRunId                      BigInt                  @map("budget_run_id")
-  monthIndex                       Int                     @map("month_index")
-  income                           Int                     @default(0)
-  lockedCommitmentsTotal           Int                     @default(0) @map("locked_commitments_total")
-  billsEstimated                   Int                     @default(0) @map("bills_estimated")
-  billsActual                      Int?                    @default(0) @map("bills_actual")
-  overtimeUnits                    Int                     @default(0) @map("overtime_units")
-  overtimeIncome                   Int                     @default(0) @map("overtime_income")
-  overtimeHealthCost               Int                     @default(0) @map("overtime_health_cost") @db.SmallInt
-  healthIndexStart                 Int                     @default(50) @map("health_index_start") @db.SmallInt
-  healthIndexEnd                   Int?                    @map("health_index_end") @db.SmallInt
-  lqiStart                         Int                     @default(50) @map("lqi_start") @db.SmallInt
-  lqiEnd                           Int?                    @map("lqi_end") @db.SmallInt
-  cumulativeFutureYou              Int                     @default(0) @map("cumulative_future_you")
-  createdAt                        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  currentWeek                      Int                     @default(0) @map("current_week") @db.SmallInt
-  billReserveOptionCode            String?                 @map("bill_reserve_option_code")
-  spendModeCode                    String?                 @map("spend_mode_code")
-  billReserveTarget                Int                     @default(0) @map("bill_reserve_target")
-  billReserveStart                 Int                     @default(0) @map("bill_reserve_start")
-  billReserveEnd                   Int                     @default(0) @map("bill_reserve_end")
-  structuralOvercommitmentOccurred Boolean                 @default(false) @map("structural_overcommitment_occurred")
-  stressModeActive                 Boolean                 @default(false) @map("stress_mode_active")
-  forcedRestWeek                   Int?                    @map("forced_rest_week") @db.SmallInt
-  incomeLossFromForcedRest         Int                     @default(0) @map("income_loss_from_forced_rest")
-  hiRecoveryFromForcedRest         Int?                    @map("hi_recovery_from_forced_rest") @db.SmallInt
-  billReconcileBreakdown           Json?                   @default("{}") @map("bill_reconcile_breakdown")
-  freeCash                         Float                   @default(0) @map("free_cash")
-  allocations                      BudgetMonthAllocation[]
+  id                               BigInt                     @id @default(autoincrement())
+  budgetRunId                      BigInt                     @map("budget_run_id")
+  monthIndex                       Int                        @map("month_index")
+  income                           Int                        @default(0)
+  lockedCommitmentsTotal           Int                        @default(0) @map("locked_commitments_total")
+  billsEstimated                   Int                        @default(0) @map("bills_estimated")
+  billsActual                      Int?                       @default(0) @map("bills_actual")
+  cumulativeFutureYou              Int                        @default(0) @map("cumulative_future_you")
+  createdAt                        DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  currentWeek                      Int                        @default(0) @map("current_week") @db.SmallInt
+  billReserveOptionCode            String?                    @map("bill_reserve_option_code")
+  spendModeCode                    String?                    @map("spend_mode_code")
+  structuralOvercommitmentOccurred Boolean                    @default(false) @map("structural_overcommitment_occurred")
+  stressModeActive                 Boolean                    @default(false) @map("stress_mode_active")
+  freeCash                         Float                      @default(0) @map("free_cash")
+  billResolution                   BudgetMonthBillResolution?
+  indexResolution                  BudgetMonthIndexResolution?
+  jars                             BudgetMonthJar[]
   events                           BudgetMonthEvent[]
-  spendByJar                       BudgetMonthSpendByJar[]
-  budgetRun                        BudgetRun               @relation(fields: [budgetRunId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  budgetRun                        BudgetRun                  @relation(fields: [budgetRunId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([budgetRunId, monthIndex])
   @@index([budgetRunId], map: "idx_budget_run_months_run")
@@ -268,33 +271,69 @@ model BudgetRunMonth {
   @@schema("public")
 }
 
-model BudgetMonthAllocation {
-  id            BigInt         @id @default(autoincrement())
-  budgetMonthId BigInt         @map("budget_month_id")
-  jarCode       String         @map("jar_code")
-  amount        Int            @default(0)
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  month         BudgetRunMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model BudgetMonthBillResolution {
+  id                    BigInt          @id @default(autoincrement())
+  budgetMonthId          BigInt          @unique @map("budget_month_id")
+  billReserveTarget      Int             @default(0) @map("bill_reserve_target")
+  billReserveStart       Int             @default(0) @map("bill_reserve_start")
+  billReserveEnd         Int             @default(0) @map("bill_reserve_end")
+  billReconcileBreakdown Json?           @default("{}") @map("bill_reconcile_breakdown")
+  shortfallTotal         Int             @default(0) @map("shortfall_total")
+  surplusToFreeCash      Int             @default(0) @map("surplus_to_free_cash")
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  month                  BudgetRunMonth  @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([budgetMonthId, jarCode])
-  @@index([budgetMonthId], map: "idx_budget_month_allocations_month")
-  @@map("budget_month_allocations")
+  @@index([budgetMonthId], map: "idx_budget_month_bill_resolution_month")
+  @@map("budget_month_bill_resolution")
   @@schema("public")
 }
 
-model BudgetMonthSpendByJar {
-  id                BigInt         @id @default(autoincrement())
-  budgetMonthId     BigInt         @map("budget_month_id")
-  jarCode           String         @map("jar_code")
-  spentAmount       Int            @default(0) @map("spent_amount")
-  overflowInAmount  Int            @default(0) @map("overflow_in_amount")
-  overflowOutAmount Int            @default(0) @map("overflow_out_amount")
-  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  month             BudgetRunMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model BudgetMonthIndexResolution {
+  id                           BigInt          @id @default(autoincrement())
+  budgetMonthId                 BigInt          @unique @map("budget_month_id")
+  hiStart                       Int             @default(50) @map("hi_start") @db.SmallInt
+  hiEnd                         Int?            @map("hi_end") @db.SmallInt
+  lqiStart                      Int             @default(50) @map("lqi_start") @db.SmallInt
+  lqiEnd                        Int?            @map("lqi_end") @db.SmallInt
+  lqiStateStart                 String?         @map("lqi_state_start")
+  lqiStateEnd                   String?         @map("lqi_state_end")
+  baselineRecovery              Int             @default(0) @map("baseline_recovery") @db.SmallInt
+  funRecoveryBonus              Int             @default(0) @map("fun_recovery_bonus") @db.SmallInt
+  jobDrain                      Int             @default(0) @map("job_drain") @db.SmallInt
+  eventHiEffectTotal            Int             @default(0) @map("event_hi_effect_total") @db.SmallInt
+  stressEffect                  Int             @default(0) @map("stress_effect") @db.SmallInt
+  hiNetChange                   Int             @default(0) @map("hi_net_change") @db.SmallInt
+  baselineRecoveryEfficiencyPct Decimal?        @map("baseline_recovery_efficiency_pct") @db.Decimal(5, 4)
+  funRecoveryEfficiencyPct      Decimal?        @map("fun_recovery_efficiency_pct") @db.Decimal(5, 4)
+  eventPoolBiasState            String?         @map("event_pool_bias_state")
+  forcedRestWeek                Int?            @map("forced_rest_week") @db.SmallInt
+  incomeLossFromForcedRest      Int             @default(0) @map("income_loss_from_forced_rest")
+  hiRecoveryFromForcedRest      Int?            @map("hi_recovery_from_forced_rest") @db.SmallInt
+  createdAt                     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  month                         BudgetRunMonth  @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  weeklyIndexProgress           Json            @default("{}") @map("weekly_index_progress")
+
+  @@index([budgetMonthId], map: "idx_budget_month_index_resolution_month")
+  @@map("budget_month_index_resolution")
+  @@schema("public")
+}
+
+model BudgetMonthJar {
+  id                 BigInt         @id @default(autoincrement())
+  budgetMonthId      BigInt         @map("budget_month_id")
+  jarCode            String         @map("jar_code")
+  allocatedAmount    Int            @default(0) @map("allocated_amount")
+  spentAmount        Int            @default(0) @map("spent_amount")
+  overflowInAmount   Int            @default(0) @map("overflow_in_amount")
+  overflowOutAmount  Int            @default(0) @map("overflow_out_amount")
+  remainingBalanceEnd Int           @default(0) @map("remaining_balance_end")
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  month              BudgetRunMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([budgetMonthId, jarCode])
-  @@index([budgetMonthId], map: "idx_budget_month_spend_by_jar_month")
-  @@map("budget_month_spend_by_jar")
+  @@index([budgetMonthId], map: "idx_budget_month_jars_month")
+  @@map("budget_month_jars")
   @@schema("public")
 }
 

@@ -1,4 +1,49 @@
 import { createHash } from 'crypto';
+import type { BudgetSimulationModuleConfig } from './budget-simulation.constant';
+
+export type LqiState = 'stable' | 'compressed' | 'strained';
+
+/**
+ * Resolves numeric LQI to player-facing state using module index_rules thresholds.
+ * stable: LQI >= stable_min; compressed: between compressed_min and compressed_max; else strained.
+ */
+export function resolveLqiState(
+  lqi: number,
+  config: BudgetSimulationModuleConfig,
+): LqiState {
+  const t = config.indexRules?.lqiThresholds;
+  if (!t) return 'stable';
+  if (lqi >= t.stableMin) return 'stable';
+  if (lqi >= t.compressedMin && lqi <= t.compressedMax) return 'compressed';
+  return 'strained';
+}
+
+/**
+ * Clamps HI to index_rules bounds (hi_floor, hi_cap).
+ */
+export function clampHi(
+  rawHi: number,
+  config: BudgetSimulationModuleConfig,
+): number {
+  const r = config.indexRules;
+  if (!r) return Math.max(0, Math.min(100, rawHi));
+  return Math.min(
+    r.hiCap,
+    Math.max(r.hiFloor, Math.round(rawHi)),
+  );
+}
+
+/**
+ * Clamps LQI to index_rules lqi_floor and 100.
+ */
+export function clampLqi(
+  rawLqi: number,
+  config: BudgetSimulationModuleConfig,
+): number {
+  const r = config.indexRules;
+  const floor = r?.lqiFloor ?? 0;
+  return Math.max(floor, Math.min(100, Math.round(rawLqi)));
+}
 
 /**
  * Returns a deterministic float in [0, 1) from seed string.

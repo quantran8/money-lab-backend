@@ -1,5 +1,13 @@
 {
   "compilerOptions": {
+    "paths": {
+      "@app/*": ["src/*"],
+      "@budget-simulation/*": ["src/budget-simulation/*"],
+      "@learn/*": ["src/learn/*"],
+      "@common/*": ["src/common/*"],
+      "@prisma/*": ["src/prisma/*"],
+      "@supabase/*": ["src/supabase/*"]
+    },
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
@@ -21,5 +29,5 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
-  }
+  } 
 }

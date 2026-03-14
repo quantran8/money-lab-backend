@@ -23,3 +23,9 @@ export enum SpendModeCode {
   enjoy = 'ENJOY',
   save = 'SAVE',
 }
+
+export enum LqiState {
+  stable = 'stable',
+  compressed = 'compressed',
+  strained = 'strained',
+}

@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@prisma/prisma.service';
 import {
   BILL_RESERVE_OPTIONS,
   SPEND_MODE_OPTIONS,
 } from '../budget-simulation.constant';
+import { CommitmentLayer } from '../budget-simulation.enum';
 
 /** Shape of CommitmentTemplate.impact JSON (hi, lqi, utility_modifiers). */
 export interface CommitmentTemplateImpact {
@@ -70,7 +71,7 @@ export class CommitmentQuery {
   /** Bill-layer templates for a module. */
   async findBillTemplates(moduleId: number) {
     return this.prisma.commitmentTemplate.findMany({
-      where: { moduleId, layer: 'bills' },
+      where: { moduleId, layer: CommitmentLayer.bills },
     });
   }
 

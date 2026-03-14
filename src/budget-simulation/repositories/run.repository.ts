@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@prisma/prisma.service';
+import { TxClient } from '../budget-simulation.constant';
 
-/** Client for use inside $transaction; accepts both PrismaService and tx from $transaction callback. */
-export type TxClient = Prisma.TransactionClient;
 /**
  * Write operations for budget runs, user job state, and run commitments.
  * Pass tx when running inside a transaction.

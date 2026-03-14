@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '@prisma/prisma.service';
 
 /**
  * Read-only data access for budget runs, jobs, and user job state.
@@ -24,7 +24,7 @@ export class BudgetRunQuery {
     });
   }
 
-  /** Active run for user with jobState, latest month (allocations, spendByJar), commitments with template. */
+  /** Active run for user with jobState, latest month (jars, bill/index resolution), commitments with template. */
   async findActiveRunWithDetails(userId: string) {
     return this.prisma.budgetRun.findFirst({
       where: { userId },
@@ -35,8 +35,9 @@ export class BudgetRunQuery {
           orderBy: { monthIndex: 'desc' },
           take: 1,
           include: {
-            allocations: true,
-            spendByJar: true,
+            jars: true,
+            billResolution: true,
+            indexResolution: true,
           },
         },
         commitments: { include: { template: true } },
@@ -52,7 +53,7 @@ export class BudgetRunQuery {
     });
   }
 
-  /** Run with latest month, spendByJar, allocations, commitments with template, jobState with job.levels. */
+  /** Run with latest month, jars, bill/index resolution, commitments with template, jobState with job.levels. */
   async findRunWithLatestMonthAndCommitments(runId: bigint) {
     return this.prisma.budgetRun.findUnique({
       where: { id: runId },
@@ -66,8 +67,9 @@ export class BudgetRunQuery {
           orderBy: { monthIndex: 'desc' },
           take: 1,
           include: {
-            spendByJar: true,
-            allocations: true,
+            jars: true,
+            billResolution: true,
+            indexResolution: true,
           },
         },
         commitments: { include: { template: true } },
