@@ -1,5 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
+import type {
+  JobRow,
+  JobWithLevel1Row,
+  ActiveRunWithDetailsRow,
+  RunWithJobStateRow,
+  RunWithLatestMonthAndCommitmentsRow,
+  UserJobStateLatestRow,
+  UserRunCommitmentWithTemplateRow,
+} from '../types/run.types';
 
 /**
  * Read-only data access for budget runs, jobs, and user job state.
@@ -10,12 +19,12 @@ export class BudgetRunQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   /** All jobs (for setup options). */
-  async findJobsMany() {
+  async findJobsMany(): Promise<JobRow[]> {
     return this.prisma.job.findMany();
   }
 
   /** Job with level 1 for income calculation. */
-  async findJobWithLevel1(jobId: bigint) {
+  async findJobWithLevel1(jobId: bigint): Promise<JobWithLevel1Row | null> {
     return this.prisma.job.findFirst({
       where: { id: jobId },
       include: {
@@ -25,7 +34,9 @@ export class BudgetRunQuery {
   }
 
   /** Active run for user with jobState, latest month (jars, bill/index resolution), commitments with template. */
-  async findActiveRunWithDetails(userId: string) {
+  async findActiveRunWithDetails(
+    userId: string,
+  ): Promise<ActiveRunWithDetailsRow | null> {
     return this.prisma.budgetRun.findFirst({
       where: { userId },
       orderBy: { startedAt: 'desc' },
@@ -46,7 +57,9 @@ export class BudgetRunQuery {
   }
 
   /** Run by id with jobState and job (for startMonth). */
-  async findRunWithJobState(runId: bigint) {
+  async findRunWithJobState(
+    runId: bigint,
+  ): Promise<RunWithJobStateRow | null> {
     return this.prisma.budgetRun.findUnique({
       where: { id: runId },
       include: { jobState: { include: { job: true } } },
@@ -54,7 +67,9 @@ export class BudgetRunQuery {
   }
 
   /** Run with latest month, jars, bill/index resolution, commitments with template, jobState with job.levels. */
-  async findRunWithLatestMonthAndCommitments(runId: bigint) {
+  async findRunWithLatestMonthAndCommitments(
+    runId: bigint,
+  ): Promise<RunWithLatestMonthAndCommitmentsRow | null> {
     return this.prisma.budgetRun.findUnique({
       where: { id: runId },
       include: {
@@ -77,7 +92,10 @@ export class BudgetRunQuery {
     });
   }
 
-  async findLatestUserJobState(userId: string, jobId: bigint) {
+  async findLatestUserJobState(
+    userId: string,
+    jobId: bigint,
+  ): Promise<UserJobStateLatestRow | null> {
     return this.prisma.userJobState.findFirst({
       where: { userId, jobId },
       orderBy: { createdAt: 'desc' },
@@ -85,7 +103,9 @@ export class BudgetRunQuery {
   }
 
   /** Commitments for a run with template (for startMonth / bills). */
-  async findCommitmentsForRunWithTemplates(runId: bigint) {
+  async findCommitmentsForRunWithTemplates(
+    runId: bigint,
+  ): Promise<UserRunCommitmentWithTemplateRow[]> {
     return this.prisma.userRunCommitment.findMany({
       where: { budgetRunId: runId },
       include: { template: true },

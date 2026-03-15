@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetSimulationSetupService } from './services/setup.service';
 import { BudgetSimulationRunService } from './services/run.service';
-import { BudgetSimulationMonthService } from './services/month.service';
+import { BudgetSimulationMonthService } from './services/month/month.service';
 
 /**
  * Facade for budget-simulation domain. Delegates to setup, run, and month services.

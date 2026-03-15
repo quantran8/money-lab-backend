@@ -1,4 +1,4 @@
-Architecture Guide v1.0 (Simplified)
+Architecture Guide v1.1 
 1. Overview
 
 This document defines the backend architecture standards for the project.
@@ -6,25 +6,19 @@ This document defines the backend architecture standards for the project.
 Goals
 
 Maintainable codebase
-
 Clear separation of responsibilities
-
 Scalable architecture
-
 Consistent implementation
 
 Technology Stack
 
 Framework
-
 NestJS
 
 Database ORM
-
 Prisma
 
 Authentication
-
 Supabase
 
 Architecture
@@ -33,7 +27,9 @@ The backend follows a modular layered architecture.
 
 Controller
    ↓
-Service (Business Logic)
+Service (Business Workflow)
+   ↓
+Domain Helpers (Pure Logic)
    ↓
 Query / Repository
    ↓
@@ -45,7 +41,6 @@ Each layer has a clear responsibility.
 
 2. Architecture Layers
 2.1 Controller Layer
-
 Role
 
 Handle HTTP requests and responses.
@@ -53,11 +48,8 @@ Handle HTTP requests and responses.
 Responsibilities
 
 Define API routes
-
 Validate request input using DTOs
-
 Call service methods
-
 Return responses
 
 Controllers must remain thin.
@@ -73,7 +65,6 @@ call Prisma
 construct queries
 
 Example
-
 @Post('start-month')
 startMonth(
   @Request() req,
@@ -85,22 +76,18 @@ startMonth(
     dto.allocations
   );
 }
-2.2 Service Layer (Business Logic)
-
+2.2 Service Layer (Business Workflow)
 Role
 
-Implement business rules and application workflows.
+Implement business workflows and coordinate domain operations.
 
 Responsibilities
 
-Implement business logic
-
-Validate domain rules
-
-Coordinate query and repository operations
-
+Implement application workflows
+Validate business rules
+Call domain helpers for complex logic
+Coordinate queries and repositories
 Handle transactions
-
 Throw HTTP exceptions when rules fail
 
 Services must not:
@@ -109,10 +96,11 @@ know HTTP details
 
 call Prisma directly
 
+implement large calculation logic
+
 construct ORM queries
 
 Example
-
 async startMonth(userId: string, runId: number) {
 
   const run = await this.runQuery.findRunWithLatestMonth(BigInt(runId));
@@ -121,33 +109,89 @@ async startMonth(userId: string, runId: number) {
     throw new ForbiddenException('Run not found');
   }
 
-  const income = run.jobState.currentMonthlyIncome;
+  const result = BudgetCalculator.simulateMonth(run);
 
-  return {
-    monthId: run.months[0].id.toString(),
-    income
-  };
+  await this.monthRepository.createMonth(result);
+
+  return result;
 
 }
 
-Services should read like business logic, not database queries.
+Services should read like business workflows, not database queries.
 
-2.3 Query Layer (Read Operations)
+2.3 Domain Helpers (Pure Domain Logic)
+
+Domain Helpers contain complex business calculations and simulation logic.
+
+They are pure logic modules, independent from NestJS and the database.
+
+Responsibilities
+
+Implement complex domain calculations
+Encapsulate reusable business algorithms
+Keep services small and readable
+Provide deterministic domain logic
+
+Domain Helpers must not
+
+call Prisma
+
+access repositories
+
+throw HTTP exceptions
+
+depend on NestJS decorators
+
+They should be pure functions or static classes.
+
+Example
+budget-simulation/
+  domain/
+    spending-calculator.ts
+    index-calculator.ts
+    event-engine.ts
+Example Implementation
+export class IndexCalculator {
+
+  static resolveWeek(input: WeeklyIndexInput): WeeklyIndexResult {
+
+    const hiEnd = input.hiStart + input.recovery - input.jobDrain;
+
+    const lqiEnd = input.lqiStart + input.eventEffect;
+
+    return {
+      hiEnd,
+      lqiEnd
+    };
+
+  }
+
+}
+Service Usage
+const result = IndexCalculator.resolveWeek(input);
+
+Benefits
+
+easier testing
+
+reusable logic
+
+smaller services
+
+deterministic simulation logic
+
+2.4 Query Layer (Read Operations)
 
 The Query layer handles database read operations.
 
 Responsibilities
 
 Fetch data from database
-
 Encapsulate query shapes
-
 Define relations (include/select)
-
 Hide Prisma implementation from services
 
 Example
-
 @Injectable()
 export class BudgetRunQuery {
 
@@ -169,25 +213,18 @@ export class BudgetRunQuery {
 
 Services should call intent-based query methods, not build queries.
 
-Example usage
-
-const run = await this.runQuery.findRunWithLatestMonth(runId);
-2.4 Repository Layer (Write Operations)
+2.5 Repository Layer (Write Operations)
 
 Repositories handle database mutations.
 
 Responsibilities
 
 Create entities
-
 Update entities
-
 Delete entities
-
 Encapsulate Prisma write operations
 
 Example
-
 @Injectable()
 export class BudgetRunRepository {
 
@@ -202,7 +239,7 @@ export class BudgetRunRepository {
 
 }
 
-Repositories must not:
+Repositories must not
 
 contain business logic
 
@@ -219,7 +256,6 @@ class-validator
 class-transformer
 
 Example
-
 export class StartMonthDto {
 
   @IsInt()
@@ -243,7 +279,6 @@ Operations involving multiple writes must use database transactions.
 Transactions are handled at the service layer.
 
 Example
-
 await this.prisma.$transaction(async (tx) => {
 
   await this.runRepository.updateRun(runId, data);
@@ -268,6 +303,12 @@ auth/
   auth.module.ts
 
 budget-simulation/
+
+  domain/
+    spending-calculator.ts
+    index-calculator.ts
+    event-engine.ts
+
   dto/
   queries/
   repositories/
@@ -308,11 +349,14 @@ repositories
 
 DTOs
 
+domain helpers
+
 6. Dependency Flow
 
 Allowed
 
 Controller → Service
+Service → Domain Helpers
 Service → Query
 Service → Repository
 Query → Prisma
@@ -326,6 +370,8 @@ Controller → Prisma
 Service → Prisma
 Query → Service
 Repository → Service
+Domain → Prisma
+Domain → NestJS
 
 This ensures clean separation of concerns.
 
@@ -336,11 +382,8 @@ Services may throw HTTP exceptions when business rules fail.
 Examples
 
 BadRequestException
-
 ForbiddenException
-
 NotFoundException
-
 ConflictException
 
 Example
@@ -400,6 +443,8 @@ Controller
    ↓
 Service
    ↓
+Domain Helpers
+   ↓
 Query / Repository
    ↓
 Prisma
@@ -410,7 +455,8 @@ Responsibilities
 
 Layer	Responsibility
 Controller	HTTP handling + validation
-Service	Business logic
+Service	Business workflows
+Domain Helpers	Complex domain logic
 Query	Database reads
 Repository	Database writes
 Prisma	ORM
@@ -699,3 +745,170 @@ database queries inside services
 complex logic inside service methods
 
 Following these rules keeps services maintainable as the project grows.
+
+12. Type Design Rules
+12.1 Avoid Inline Complex Types
+
+Inline complex types reduce readability and create tight coupling between layers.
+
+Bad
+
+async resolveSpawnTemplate(
+  month: NonNullable<
+    Awaited<
+      ReturnType<typeof this.monthQuery.findMonthWithRunAndJobLevelAndJars>
+    >
+  >
+)
+
+Correct
+
+async resolveSpawnTemplate(
+  month: MonthWithRunAndJobLevelAndJars
+)
+
+All complex return types should be extracted into named types.
+
+12.2 Queries Should Define Their Return Types
+
+Query methods must define explicit return types instead of relying on inference.
+
+Bad
+
+async findMonthWithRunAndJars(monthId: bigint) {
+  return this.prisma.month.findUnique({
+    include: { jars: true }
+  })
+}
+
+Correct
+
+async findMonthWithRunAndJars(
+  monthId: bigint
+): Promise<MonthWithRunAndJars | null> {
+
+  return this.prisma.month.findUnique({
+    include: { jars: true }
+  })
+
+}
+
+Benefits
+
+clear data shape
+
+reusable types
+
+loose coupling between layers
+
+12.3 Avoid ReturnType / Awaited in Service Code
+
+Service code must not depend on query implementation details.
+
+Bad
+
+type MonthCtx = NonNullable<
+  Awaited<
+    ReturnType<BudgetMonthQuery['findMonthWithRunAndJobLevelAndJars']>
+  >
+>
+
+Correct
+
+type MonthCtx = MonthWithRunAndJobLevelAndJars
+
+Query return types should be defined in shared type files.
+
+12.4 Use Domain Types for Data Shapes
+
+Common data structures should be defined in domain types.
+
+Example
+
+budget-simulation/
+  types/
+    month.types.ts
+    run.types.ts
+    event.types.ts
+    jar.types.ts
+
+Example
+
+export interface MonthWithRunAndJars {
+  id: bigint
+  monthIndex: number
+  currentWeek: number
+  budgetRunId: bigint
+
+  jars: JarState[]
+
+  budgetRun: {
+    moduleId: number
+  }
+}
+
+These types can be reused across:
+
+queries
+
+services
+
+domain helpers
+
+12.5 Never Inline Complex Return Types
+
+Bad
+
+Promise<{ estimated: number; actual: number; delta: number }>
+
+Correct
+
+Promise<BillsReconcileResult>
+
+Example
+
+export interface BillsReconcileResult {
+  estimated: number
+  actual: number
+  delta: number
+}
+
+Benefits
+
+better readability
+
+reusable types
+
+safer refactoring
+
+12.6 Naming Conventions for Types
+
+Type naming should follow clear conventions.
+
+Type	Purpose
+XxxDto	request DTO
+XxxResponse	API response
+XxxResult	domain calculation result
+XxxEntity	database entity
+XxxState	runtime state object
+
+Example
+
+ResolveWeekResult
+BillsReconcileResult
+WeeklySpendResult
+MonthWithRunAndJars
+
+12.7 Implementation (budget-simulation)
+
+Shared shapes live under `src/budget-simulation/types/`:
+
+| File | Contents |
+|------|----------|
+| `month.types.ts` | Prisma month payloads (`MonthWithRun`, `MonthWithRunAndJobLevelAndJars`, …), `ChosenEventsTotalsResult`, `ReconcileBillsContext`, … |
+| `event.types.ts` | `LifeEventTemplateRow`, `SpawnEventTemplatePayload`, … |
+| `bill.types.ts` | `BillsComputeResult` |
+| `run.types.ts` | Run/job query payloads |
+| `jar.types.ts` | Re-exports jar row type |
+
+`BudgetMonthQuery` / `BudgetRunQuery` methods declare explicit `Promise<…>` return types. Services import named types from `types/` (or domain for pure calculators like `WeeklySpendSummary`). Avoid `Awaited<ReturnType<typeof query.method>>` in services.
