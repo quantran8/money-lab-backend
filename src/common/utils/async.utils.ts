@@ -10,7 +10,12 @@ export async function wrapAsync<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   try {
-    return await fn();
+    const start = Date.now();
+    const result = await fn();
+    const elapsed = Date.now() - start;
+    logger.log(`${methodName} took ${elapsed}ms`);
+    return result;
+    
   } catch (err) {
     if (err instanceof HttpException) throw err;
     const msg = err instanceof Error ? err.message : String(err);

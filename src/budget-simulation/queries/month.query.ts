@@ -79,11 +79,54 @@ export class BudgetMonthQuery {
     });
   }
 
+  /** Month with run, job levels, module, and jars in one read (resolveWeek load phase). */
+  async findMonthWithRunAndJobLevelAndJars(monthId: bigint) {
+    return this.prisma.budgetRunMonth.findUnique({
+      where: { id: monthId },
+      include: {
+        budgetRun: {
+          include: {
+            jobState: {
+              include: {
+                job: { include: { levels: true } },
+              },
+            },
+            module: true,
+          },
+        },
+        billResolution: true,
+        indexResolution: true,
+        jars: true,
+      },
+    });
+  }
+
   /** Month by id with jars. */
   async findMonthWithJars(monthId: bigint) {
     return this.prisma.budgetRunMonth.findUnique({
       where: { id: monthId },
       include: { jars: true, billResolution: true, indexResolution: true },
+    });
+  }
+
+  /** Month by id with run, jobState (for index resolution), and jars (for applyEventChoice: auth + payment + index in one read). */
+  async findMonthWithRunAndJars(monthId: bigint) {
+    return this.prisma.budgetRunMonth.findUnique({
+      where: { id: monthId },
+      include: {
+        budgetRun: {
+          include: {
+            jobState: {
+              include: {
+                job: { include: { levels: true } },
+              },
+            },
+          },
+        },
+        billResolution: true,
+        indexResolution: true,
+        jars: true,
+      },
     });
   }
 

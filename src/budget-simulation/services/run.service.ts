@@ -11,7 +11,12 @@ import { BudgetRunRepository } from '@budget-simulation/repositories/run.reposit
 import { BudgetMonthQuery } from '../queries/month.query';
 import { BudgetMonthRepository } from '../repositories/month.repository';
 import { CommitmentQuery } from '../queries/commitment.query';
-import { BillReserveOptionCode, CommitmentLayer, JarCode } from '../budget-simulation.enum';
+import {
+  BillReserveOptionCode,
+  CommitmentLayer,
+  JarCode,
+} from '../budget-simulation.enum';
+import { BILL_RESERVE_OPTIONS, FREE_CASH_CODE } from '../budget-simulation.constant';
 import { PrismaService } from '@app/prisma/prisma.service';
 import { resolveLqiState } from '../budget-simulation.helpers';
 import { BudgetSimulationConfigService } from './config.service';
@@ -35,8 +40,12 @@ export class BudgetSimulationRunService {
     private readonly configService: BudgetSimulationConfigService,
   ) {}
 
-  private async getBillReserveCoveragePct(code: string): Promise<number> {
-    const option = await this.commitmentQuery.findBillReserveOptionByCode(code);
+  /**
+   * Returns bill reserve coverage percentage for a given option code.
+   * Uses constant lookup (no DB). Throws if code is invalid.
+   */
+  private getBillReserveCoveragePctSync(code: string): number {
+    const option = BILL_RESERVE_OPTIONS.find((x) => x.code === code);
     if (!option)
       throw new BadRequestException(
         `Invalid bill_reserve_option_code: ${code}`,
@@ -44,19 +53,27 @@ export class BudgetSimulationRunService {
     return option.coveragePct;
   }
 
+  /**
+   * Upserts jar allocations for a month, then ensures core jars exist.
+   * Writes run in parallel (order not required).
+   */
   private async upsertMonthAllocations(
     monthId: bigint,
     allocations: Record<string, number>,
     tx?: TxClient,
   ) {
-    const coreJars = ['fun', 'learning', 'give', 'future_you'];
-    for (const [jarCode, amount] of Object.entries(allocations)) {
-      if (jarCode === 'free_cash') continue;
-      await this.monthRepository.upsertJar(monthId, jarCode, amount, tx);
-    }
-    for (const jarCode of coreJars) {
-      await this.monthRepository.ensureJarExists(monthId, jarCode, tx);
-    }
+    const coreJars = Object.values(JarCode);
+    const upsertEntries = Object.entries(allocations).filter(
+      ([code]) => code !== FREE_CASH_CODE,
+    );
+    await Promise.all([
+      ...upsertEntries.map(([jarCode, amount]) =>
+        this.monthRepository.upsertJar(monthId, jarCode, amount, tx),
+      ),
+      ...coreJars.map((jarCode) =>
+        this.monthRepository.ensureJarExists(monthId, jarCode, tx),
+      ),
+    ]);
   }
 
   async getActiveBudgetRun(userId: string) {
@@ -64,15 +81,17 @@ export class BudgetSimulationRunService {
       const run = await this.runQuery.findActiveRunWithDetails(userId);
       if (!run) return null;
 
-      const billTemplates = await this.commitmentQuery.findBillTemplates(3);
       const housingId = run.commitments.find(
         (c) => c.template.category === 'housing',
       )?.template.id;
-      const housingUtilityModifiers = housingId
-        ? await this.commitmentQuery.findHousingModifiersByCommitmentIds([
-            housingId,
-          ])
-        : [];
+      const [billTemplates, housingUtilityModifiers] = await Promise.all([
+        this.commitmentQuery.findBillTemplates(3),
+        housingId
+          ? this.commitmentQuery.findHousingModifiersByCommitmentIds([
+              housingId,
+            ])
+          : Promise.resolve([]),
+      ]);
 
       const billEstimatedTemplates = billTemplates.map((t) => {
         const modifiers = housingUtilityModifiers.find(
@@ -90,11 +109,11 @@ export class BudgetSimulationRunService {
 
       const latestMonth = run.months[0];
       const jarsArr =
-        latestMonth?.jars.filter((j) => j.jarCode !== 'free_cash') ?? [];
+        latestMonth?.jars.filter((j) => j.jarCode !== FREE_CASH_CODE) ?? [];
 
       const freeCashAlloc = latestMonth?.freeCash ?? 0;
       const freeCashJar = latestMonth?.jars.find(
-        (j) => j.jarCode === 'free_cash',
+        (j) => j.jarCode === FREE_CASH_CODE,
       );
       const freeCashBalance = freeCashJar
         ? Number(freeCashJar.allocatedAmount) -
@@ -108,7 +127,7 @@ export class BudgetSimulationRunService {
         (latestMonth?.billsEstimated ?? 0) +
         (latestMonth?.billResolution?.billReserveTarget ?? 0);
 
-      return {
+      const result = {
         id: run.id.toString(),
         moduleId: run.moduleId,
         userId: run.userId,
@@ -145,6 +164,7 @@ export class BudgetSimulationRunService {
           {} as Record<string, { allocation: number; balance: number }>,
         ),
       };
+      return result;
     });
   }
 
@@ -155,17 +175,16 @@ export class BudgetSimulationRunService {
     commitmentAmounts: Record<number, number>,
   ) {
     return wrapAsync(this.logger, 'startBudgetRun', async () => {
-      const job = await this.runQuery.findJobWithLevel1(BigInt(jobId));
+      const jobIdBig = BigInt(jobId);
+      const [job, jobState] = await Promise.all([
+        this.runQuery.findJobWithLevel1(jobIdBig),
+        this.runQuery.findLatestUserJobState(userId, jobIdBig),
+      ]);
       if (!job) throw new NotFoundException('Job not found');
 
       const income = job.levels[0]?.incomeBaseOverride ?? job.baseMonthlyIncome;
 
-      const jobState = await this.runQuery.findLatestUserJobState(
-        userId,
-        BigInt(jobId),
-      );
-
-      return this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         let state = jobState;
         if (!state) {
           state = await this.runRepository.createUserJobState(
@@ -219,6 +238,7 @@ export class BudgetSimulationRunService {
           jobStateId: state.id.toString(),
         };
       });
+      return result;
     });
   }
 
@@ -235,17 +255,19 @@ export class BudgetSimulationRunService {
     spendModeCode: string,
   ) {
     return wrapAsync(this.logger, 'startMonth', async () => {
-      const run = await this.runQuery.findRunWithJobState(BigInt(runId));
+      const runIdBig = BigInt(runId);
+      const run = await this.runQuery.findRunWithJobState(runIdBig);
       if (!run || run.userId !== userId)
         throw new ForbiddenException('Forbidden or Run not found');
 
-      const covPct = await this.getBillReserveCoveragePct(
-        billReserveOptionCode,
-      );
+      const covPct = this.getBillReserveCoveragePctSync(billReserveOptionCode);
 
-      const prevMonth = await this.monthQuery.findPreviousMonth(BigInt(runId));
+      const [prevMonth, commitments] = await Promise.all([
+        this.monthQuery.findPreviousMonth(runIdBig),
+        this.runQuery.findCommitmentsForRunWithTemplates(runIdBig),
+      ]);
+
       const coreJars = Object.values(JarCode) as string[];
-
       let prevMonthFreeCashBalance = 0;
       let prevJarBalances: Record<string, number> = {};
       const jarsRefillNeeded = { ...allocations };
@@ -302,9 +324,6 @@ export class BudgetSimulationRunService {
       const stress = prevMonth?.structuralOvercommitmentOccurred ?? false;
       const billReserveStart = prevMonth?.billResolution?.billReserveEnd ?? 0;
 
-      const commitments =
-        await this.runQuery.findCommitmentsForRunWithTemplates(BigInt(runId));
-
       const lockedTotal = commitments
         .filter((c) => c.template.layer === CommitmentLayer.locked)
         .reduce((sum, c) => sum + c.selectedAmount, 0);
@@ -316,15 +335,14 @@ export class BudgetSimulationRunService {
       const housingIds = commitments
         .filter((c) => c.template.category === 'housing')
         .map((c) => c.commitmentTemplateId);
-      const housingUtilityModifiers =
-        await this.commitmentQuery.findHousingModifiersByCommitmentIds(
-          housingIds,
-        );
 
-      const billTemplates = await this.commitmentQuery.findBillTemplatesByLayer(
-        3,
-        CommitmentLayer.bills,
-      );
+      const [housingUtilityModifiers, billTemplates] = await Promise.all([
+        this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds),
+        this.commitmentQuery.findBillTemplatesByLayer(
+          3,
+          CommitmentLayer.bills,
+        ),
+      ]);
 
       const billsEstimated = billTemplates.reduce((sum, t) => {
         const modifier = housingUtilityModifiers.find(
@@ -361,7 +379,7 @@ export class BudgetSimulationRunService {
         prevMonthFreeCashBalance + monthFreeCash,
       );
 
-      return this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const month = await this.monthRepository.createMonth(
           {
             budgetRunId: BigInt(runId),
@@ -430,6 +448,7 @@ export class BudgetSimulationRunService {
           lqiStart: lqiStart,
         };
       });
+      return result;
     });
   }
 
@@ -475,17 +494,18 @@ export class BudgetSimulationRunService {
         (c) => c.template.category === 'housing',
       );
       const housingIds = billingCommitments.map((c) => c.commitmentTemplateId);
-      const housingUtilityModifiers =
+
+      const [housingUtilityModifiers, billTemplates] = await Promise.all([
         housingIds.length > 0
-          ? await this.commitmentQuery.findHousingModifiersByCommitmentIds(
+          ? this.commitmentQuery.findHousingModifiersByCommitmentIds(
               housingIds,
             )
-          : [];
-
-      const billTemplates = await this.commitmentQuery.findBillTemplatesByLayer(
-        run.moduleId,
-        CommitmentLayer.bills,
-      );
+          : Promise.resolve([]),
+        this.commitmentQuery.findBillTemplatesByLayer(
+          run.moduleId,
+          CommitmentLayer.bills,
+        ),
+      ]);
 
       const estimatedBills = billTemplates.reduce((sum, t) => {
         const modifier = housingUtilityModifiers.find(
@@ -496,7 +516,7 @@ export class BudgetSimulationRunService {
 
       const optionCode =
         latestMonth.billReserveOptionCode || BillReserveOptionCode.high;
-      const covPct = await this.getBillReserveCoveragePct(optionCode);
+      const covPct = this.getBillReserveCoveragePctSync(optionCode);
       const reserveTarget = Math.round((covPct / 100) * estimatedBills);
       const reserveStart = latestMonth.billResolution?.billReserveEnd ?? 0;
       const reserveRefill = Math.max(0, reserveTarget - reserveStart);
@@ -532,7 +552,7 @@ export class BudgetSimulationRunService {
       }
 
       const freeCashJar = latestMonth.jars.find(
-        (j) => j.jarCode === 'free_cash',
+        (j) => j.jarCode === FREE_CASH_CODE,
       );
       const freeCashBalance = freeCashJar
         ? Math.max(
@@ -547,7 +567,7 @@ export class BudgetSimulationRunService {
       const flexibleIncome =
         finalIncome - lockedTotal - estimatedBills - reserveRefill;
 
-      return {
+      const result = {
         monthIndex: latestMonth.monthIndex + 1,
         income: {
           baseIncome,
@@ -572,6 +592,7 @@ export class BudgetSimulationRunService {
           flexibleIncome,
         },
       };
+      return result;
     });
   }
 }
