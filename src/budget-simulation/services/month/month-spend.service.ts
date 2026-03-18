@@ -4,8 +4,8 @@ import { BudgetMonthRepository } from '@budget-simulation/repositories/month.rep
 import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
 import type { WeeklySpendSummary } from '@budget-simulation/domain';
-import type { TxClient } from '@budget-simulation/budget-simulation.constant';
 import { buildJarAvailableMap, computeWeeklySpend, jarAvailable } from '@budget-simulation/domain';
+import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
  * Handles jar spending only: compute weekly spend, apply spend log, jar availability.

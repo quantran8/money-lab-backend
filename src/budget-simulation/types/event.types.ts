@@ -21,10 +21,16 @@ export interface SpawnEventOptionPayload {
   healthDelta: number;
   lqiDelta: number;
   learningXpDelta: number;
+  /** OT accept: amount added to next month BUDGET_RUN_MONTHS.income (not immediate cash). */
+  deferredOvertimePayoutNextMonth?: number;
 }
 
 /** API-shaped event template for resolve-week / spawn. */
 export interface SpawnEventTemplatePayload {
+  /** budget_month_events.id — use on apply-event-choice when multiple pending. */
+  eventId: string;
+  eventSource: string;
+  eventSubtype?: string | null;
   templateId: string;
   title: string;
   description: string;

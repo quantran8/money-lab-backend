@@ -53,6 +53,17 @@ export interface HousingModifierRow {
 export class CommitmentQuery {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Template id and category for given ids (e.g. for update-run-commitments category checks). */
+  async findTemplatesByIds(
+    ids: bigint[],
+  ): Promise<{ id: bigint; category: string }[]> {
+    if (ids.length === 0) return [];
+    return this.prisma.commitmentTemplate.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, category: true },
+    });
+  }
+
   /** Commitment templates by module and layers, sorted. */
   async findCommitmentTemplates(moduleId: number, layers: string[]) {
     return this.prisma.commitmentTemplate.findMany({

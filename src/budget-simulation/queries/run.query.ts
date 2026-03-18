@@ -62,7 +62,9 @@ export class BudgetRunQuery {
   ): Promise<RunWithJobStateRow | null> {
     return this.prisma.budgetRun.findUnique({
       where: { id: runId },
-      include: { jobState: { include: { job: true } } },
+      include: {
+        jobState: { include: { job: { include: { levels: true } } } },
+      },
     });
   }
 
@@ -108,6 +110,28 @@ export class BudgetRunQuery {
   ): Promise<UserRunCommitmentWithTemplateRow[]> {
     return this.prisma.userRunCommitment.findMany({
       where: { budgetRunId: runId },
+      include: { template: true },
+    });
+  }
+
+  /**
+   * Commitments active for a given month: effectiveFromMonthIndex <= monthIndex
+   * and (effectiveToMonthIndex is null or effectiveToMonthIndex >= monthIndex).
+   * Returns rows with template for use in month-based calculations.
+   */
+  async findActiveCommitmentsForMonth(
+    runId: bigint,
+    monthIndex: number,
+  ): Promise<UserRunCommitmentWithTemplateRow[]> {
+    return this.prisma.userRunCommitment.findMany({
+      where: {
+        budgetRunId: runId,
+        effectiveFromMonthIndex: { lte: monthIndex },
+        OR: [
+          { effectiveToMonthIndex: null },
+          { effectiveToMonthIndex: { gte: monthIndex } },
+        ],
+      },
       include: { template: true },
     });
   }

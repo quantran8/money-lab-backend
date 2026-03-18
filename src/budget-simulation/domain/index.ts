@@ -39,7 +39,21 @@ export {
   chooseTemplate,
   chooseTemplateIfSpawn,
   shouldSpawn,
+  shouldSpawnLane,
 } from './events/event-spawn-engine';
+export {
+  resolveOvertimeEffectsFromJobLevel,
+  isOvertimeAcceptOption,
+} from './events/overtime-effects';
+export {
+  resolveBaseJobIncome,
+  calculateMonthIncome,
+  resolveOvertimeChoicePersistence,
+} from './income/month-income';
+export type {
+  CalculateMonthIncomeParams,
+  OvertimeChoiceResolutionInput,
+} from './income/month-income';
 export type {
   EventPoolWeight,
   EventTemplateRef,

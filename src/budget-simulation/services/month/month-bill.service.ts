@@ -2,13 +2,14 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
 import { END_OF_MONTH_WEEK } from '@budget-simulation/budget-simulation.constant';
-import type { TxClient } from '@budget-simulation/budget-simulation.constant';
 import { computeBills as domainComputeBills, billsReconcile } from '@budget-simulation/domain';
 import { MonthSpendService } from './month-spend.service';
 import type {
   BillsComputeResult,
   ReconcileBillsContext,
 } from '@budget-simulation/types';
+import { JarCode } from '@app/budget-simulation/budget-simulation.enum';
+import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
  * Handles bill reconciliation: finalize bills, reconcile with jars, persist.
@@ -131,7 +132,7 @@ export class MonthBillService {
       throw new ForbiddenException('Forbidden');
     const jars = await this.monthQuery.findJarsForMonth(
       monthIdBig,
-      ['fun', 'give', 'learning', 'free_cash', 'future_you'],
+      Object.values(JarCode),
       tx,
     );
     return this.reconcileBillsWithContext(

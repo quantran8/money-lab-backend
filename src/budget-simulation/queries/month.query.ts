@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { TxClient } from '../budget-simulation.constant';
+import {
+  EVENT_SOURCE_LIFE,
+  EVENT_SOURCE_WORK,
+  EVENT_SUBTYPE_OVERTIME,
+} from '../budget-simulation.constant';
 import type {
   MonthPreviousRow,
   MonthWithRun,
@@ -20,6 +24,7 @@ import type {
   ModuleEventPoolWeightRow,
   LifeEventOptionRow,
 } from '../types/event.types';
+import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
  * Read-only data access for budget months, jars, bill/index resolution, and life events.
@@ -104,9 +109,7 @@ export class BudgetMonthQuery {
   }
 
   /** Month by id with jars. */
-  async findMonthWithJars(
-    monthId: bigint,
-  ): Promise<MonthWithJars | null> {
+  async findMonthWithJars(monthId: bigint): Promise<MonthWithJars | null> {
     return this.prisma.budgetRunMonth.findUnique({
       where: { id: monthId },
       include: { jars: true, billResolution: true, indexResolution: true },
@@ -199,6 +202,22 @@ export class BudgetMonthQuery {
         week,
         chosenOptionId: null,
       },
+      orderBy: [{ eventSource: 'asc' }],
+    });
+  }
+
+  /** Count unresolved events for a week (module 3 may have two). */
+  async countPendingEventsForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<number> {
+    return this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        chosenOptionId: null,
+      },
     });
   }
 
@@ -220,6 +239,154 @@ export class BudgetMonthQuery {
         },
       },
     });
+  }
+
+  /** Pending life-lane event for week (module 3). */
+  async findPendingLifeEventWithTemplate(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<PendingEventWithTemplateRow | null> {
+    return this.client(tx).budgetMonthEvent.findFirst({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        chosenOptionId: null,
+        eventSource: EVENT_SOURCE_LIFE,
+      },
+      include: {
+        template: {
+          include: { options: { orderBy: { sortOrder: 'asc' } } },
+        },
+      },
+    });
+  }
+
+  /** Pending work/overtime event for week (module 3). */
+  async findPendingOvertimeEventWithTemplate(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<PendingEventWithTemplateRow | null> {
+    return this.client(tx).budgetMonthEvent.findFirst({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        chosenOptionId: null,
+        eventSource: EVENT_SOURCE_WORK,
+        eventSubtype: EVENT_SUBTYPE_OVERTIME,
+      },
+      include: {
+        template: {
+          include: { options: { orderBy: { sortOrder: 'asc' } } },
+        },
+      },
+    });
+  }
+
+  /** Single pending row by id (apply-choice targeting). */
+  async findPendingEventWithTemplateById(
+    eventId: bigint,
+    tx?: TxClient,
+  ): Promise<PendingEventWithTemplateRow | null> {
+    return this.client(tx).budgetMonthEvent.findFirst({
+      where: {
+        id: eventId,
+        chosenOptionId: null,
+      },
+      include: {
+        template: {
+          include: { options: { orderBy: { sortOrder: 'asc' } } },
+        },
+      },
+    });
+  }
+
+  /** OT template for module 3 (work / overtime). */
+  async findOvertimeEventTemplate(
+    moduleId: number,
+  ): Promise<LifeEventTemplateRow | null> {
+    return this.prisma.lifeEventTemplate.findFirst({
+      where: {
+        moduleId,
+        eventSource: EVENT_SOURCE_WORK,
+        eventSubtype: EVENT_SUBTYPE_OVERTIME,
+      },
+    });
+  }
+
+  /** Chosen events for a week (for weekly HI/LQI, including dynamic OT penalty). */
+  async findChosenEventsForWeekWithTemplates(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<
+    Array<{
+      chosenOptionId: bigint | null;
+      eventSource: string;
+      eventSubtype: string | null;
+      template: {
+        options: Array<{ id: bigint; sortOrder: number }>;
+      };
+      option: { healthDelta: number; lqiDelta: number } | null;
+    }>
+  > {
+    return this.client(tx).budgetMonthEvent.findMany({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        chosenOptionId: { not: null },
+      },
+      include: {
+        option: true,
+        template: {
+          select: { options: { select: { id: true, sortOrder: true } } },
+        },
+      },
+    }) as Promise<
+      Array<{
+        chosenOptionId: bigint | null;
+        eventSource: string;
+        eventSubtype: string | null;
+        template: {
+          options: Array<{ id: bigint; sortOrder: number }>;
+        };
+        option: { healthDelta: number; lqiDelta: number } | null;
+      }>
+    >;
+  }
+
+  /** True if this week already has a life-lane event (pending or resolved). */
+  async hasLifeLaneEventForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<boolean> {
+    const n = await this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        eventSource: EVENT_SOURCE_LIFE,
+      },
+    });
+    return n > 0;
+  }
+
+  /** True if this week already has an OT event. */
+  async hasOvertimeEventForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<boolean> {
+    const n = await this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        eventSource: EVENT_SOURCE_WORK,
+        eventSubtype: EVENT_SUBTYPE_OVERTIME,
+      },
+    });
+    return n > 0;
   }
 
   /** Count events created for this month (for max_event_count_per_month cap). Pass tx when inside a transaction. */
@@ -273,7 +440,29 @@ export class BudgetMonthQuery {
     return events.map((e) => e.eventTemplateId);
   }
 
-  /** Life event templates for module, excluding given ids. */
+  /** Life-lane template ids used in range (OT template ids excluded from dedup pool). */
+  async findUsedLifeEventTemplateIds(
+    runId: bigint,
+    fromMonthIndex: number,
+    toMonthIndex: number,
+  ): Promise<bigint[]> {
+    const events = await this.prisma.budgetMonthEvent.findMany({
+      where: {
+        eventSource: EVENT_SOURCE_LIFE,
+        month: {
+          budgetRunId: runId,
+          monthIndex: {
+            gte: fromMonthIndex,
+            lte: toMonthIndex,
+          },
+        },
+      },
+      select: { eventTemplateId: true },
+    });
+    return events.map((e) => e.eventTemplateId);
+  }
+
+  /** Life-lane templates only (excludes work/OT). */
   async findLifeEventTemplatesForModule(
     moduleId: number,
     excludeTemplateIds: bigint[],
@@ -281,6 +470,7 @@ export class BudgetMonthQuery {
     return this.prisma.lifeEventTemplate.findMany({
       where: {
         moduleId,
+        eventSource: { not: EVENT_SOURCE_WORK },
         id: excludeTemplateIds.length
           ? { notIn: excludeTemplateIds }
           : undefined,
@@ -288,7 +478,7 @@ export class BudgetMonthQuery {
     });
   }
 
-  /** Life event templates for module and category, excluding given ids. */
+  /** Life-lane templates by LQI category (positive, neutral, compromise, undesirable). */
   async findLifeEventTemplatesForModuleByCategory(
     moduleId: number,
     category: string,
@@ -298,6 +488,7 @@ export class BudgetMonthQuery {
       where: {
         moduleId,
         category,
+        eventSource: { not: EVENT_SOURCE_WORK },
         id: excludeTemplateIds.length
           ? { notIn: excludeTemplateIds }
           : undefined,

@@ -6,7 +6,6 @@ import type {
   WeeklyIndexProgressItem,
   WeeklySpendSummary,
 } from '@budget-simulation/domain';
-import type { TxClient } from '@budget-simulation/budget-simulation.constant';
 import type {
   MonthWithRunAndJobLevel,
   ChosenEventsTotalsResult,
@@ -14,6 +13,7 @@ import type {
   IndexWeeklyResolutionResult,
 } from '@budget-simulation/types';
 import { indexResolveWeek } from '@budget-simulation/domain';
+import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
  * Handles HI/LQI index: weekly resolution compute + persist.
@@ -52,9 +52,10 @@ export class MonthIndexService {
     const hiStart = Number(ir.hiEnd ?? ir.hiStart ?? 70);
     const lqiStart = Number(ir.lqiEnd ?? ir.lqiStart ?? 70);
 
-    const monthlyJobDrain =
-      Number(month.budgetRun?.jobState?.job?.baseEnergyLoad ?? 0) || 0;
-    const weeklyJobDrain = Math.round(monthlyJobDrain / 4);
+    const jobLevel = month.budgetRun?.jobState?.job?.levels.find(
+      (l) => l.level === month.budgetRun?.jobState?.level,
+    );
+    const weeklyJobDrain = Math.round(jobLevel?.baseEnergyLoadOverride ?? 0);
 
     const { healthDeltaTotal, lqiDeltaTotal } =
       preloaded?.eventTotals ??

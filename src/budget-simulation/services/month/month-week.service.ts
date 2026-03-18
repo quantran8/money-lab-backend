@@ -5,13 +5,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { wrapAsync } from '@common/utils/async.utils';
-import { PrismaService } from '@prisma/prisma.service';
 import { clampHi, clampLqi } from '@app/budget-simulation/budget-simulation.helpers';
 import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
 import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
 import { END_OF_MONTH_WEEK } from '@budget-simulation/budget-simulation.constant';
-import type { TxClient } from '@budget-simulation/budget-simulation.constant';
 import { jarAvailable } from '@budget-simulation/domain';
 import { MonthSpendService } from './month-spend.service';
 import { MonthEventService } from './month-event.service';
@@ -20,18 +18,28 @@ import { MonthBillService } from './month-bill.service';
 import { BudgetSimulationConfigService } from '../config.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
-  PendingBudgetMonthEventRow,
   PendingEventWithTemplateRow,
+  SpawnEventTemplatePayload,
 } from '@budget-simulation/types';
+import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
 
-/** Context for resolveWeek: load phase result. */
+/**
+ * Data loaded before advancing the month to the next week (two lanes: life + overtime).
+ */
 export interface ResolveWeekContext {
   month: MonthWithRunAndJobLevelAndJars;
   spendModeRate: number;
-  pendingCurrentWeek: PendingBudgetMonthEventRow | null;
+  /** Count of events on the current week index still awaiting player choice (blocks advance). */
+  unresolvedChoiceCountOnCurrentWeek: number;
   nextWeek: number;
-  existingNextWeekEvent: PendingEventWithTemplateRow | null;
-  spawnTemplateId: bigint | null;
+  /** Life-lane row for nextWeek if already spawned and unresolved. */
+  lifeEventPendingForNextWeek: PendingEventWithTemplateRow | null;
+  /** Work/overtime row for nextWeek if already spawned and unresolved. */
+  overtimeEventPendingForNextWeek: PendingEventWithTemplateRow | null;
+  /** When no life row exists for nextWeek yet and spawn roll hits: template id to insert. */
+  lifeEventTemplateIdToCreate: bigint | null;
+  /** When no OT row exists for nextWeek yet and spawn roll hits: template id to insert. */
+  overtimeEventTemplateIdToCreate: bigint | null;
 }
 
 /**
@@ -42,7 +50,7 @@ export class MonthWeekService {
   private readonly logger = new Logger(MonthWeekService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly transactionRunner: TransactionRunner,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
     private readonly configService: BudgetSimulationConfigService,
@@ -52,39 +60,58 @@ export class MonthWeekService {
     private readonly billService: MonthBillService,
   ) {}
 
-  async loadResolveWeekContext(monthId: bigint): Promise<ResolveWeekContext | null> {
+  async loadResolveWeekContext(
+    monthId: bigint,
+  ): Promise<ResolveWeekContext | null> {
     const month =
       await this.monthQuery.findMonthWithRunAndJobLevelAndJars(monthId);
     if (!month) return null;
 
     const nextWeek = month.currentWeek + 1;
-    const [spendModeRate, pendingCurrentWeek, existingNextWeekEvent] =
-      await Promise.all([
-        this.spendService.getSpendModeRate(
-          month.spendModeCode ?? SpendModeCode.normal,
-        ),
-        month.currentWeek >= 1
-          ? this.monthQuery.findPendingEvent(monthId, month.currentWeek)
-          : Promise.resolve(null),
-        this.monthQuery.findPendingEventWithTemplate(monthId, nextWeek),
-      ]);
 
-    let spawnTemplateId: bigint | null = null;
-    if (!existingNextWeekEvent) {
-      spawnTemplateId = await this.eventService.resolveSpawnTemplate(
-        monthId,
-        month,
-        nextWeek,
-      );
-    }
+    const unresolvedChoiceCountOnCurrentWeek =
+      month.currentWeek >= 1
+        ? await this.monthQuery.countPendingEventsForWeek(
+            monthId,
+            month.currentWeek,
+          )
+        : 0;
+
+    const spendModeRatePromise = this.spendService.getSpendModeRate(
+      month.spendModeCode ?? SpendModeCode.normal,
+    );
+
+    const [
+      spendModeRate,
+      lifeEventPendingForNextWeek,
+      overtimeEventPendingForNextWeek,
+      lifeEventTemplateIdToCreate,
+      overtimeEventTemplateIdToCreate,
+    ] = await Promise.all([
+      spendModeRatePromise,
+      this.monthQuery.findPendingLifeEventWithTemplate(monthId, nextWeek),
+      this.monthQuery.findPendingOvertimeEventWithTemplate(monthId, nextWeek),
+      !(await this.monthQuery.hasLifeLaneEventForWeek(monthId, nextWeek))
+        ? this.eventService.resolveLifeSpawnTemplateId(monthId, month, nextWeek)
+        : Promise.resolve(null),
+      !(await this.monthQuery.hasOvertimeEventForWeek(monthId, nextWeek))
+        ? this.eventService.resolveOvertimeSpawnTemplateId(
+            monthId,
+            month,
+            nextWeek,
+          )
+        : Promise.resolve(null),
+    ]);
 
     return {
       month,
       spendModeRate,
-      pendingCurrentWeek: pendingCurrentWeek ?? null,
+      unresolvedChoiceCountOnCurrentWeek,
       nextWeek,
-      existingNextWeekEvent: existingNextWeekEvent ?? null,
-      spawnTemplateId,
+      lifeEventPendingForNextWeek,
+      overtimeEventPendingForNextWeek,
+      lifeEventTemplateIdToCreate,
+      overtimeEventTemplateIdToCreate,
     };
   }
 
@@ -92,15 +119,23 @@ export class MonthWeekService {
     return wrapAsync(this.logger, 'resolveWeek', async () => {
       const monthIdBig = BigInt(monthId);
       const ctx = await this.loadResolveWeekContext(monthIdBig);
-      if (!ctx)
-        throw new ForbiddenException('Forbidden or Month not found');
-      const { month, spendModeRate, pendingCurrentWeek, nextWeek, existingNextWeekEvent, spawnTemplateId } = ctx;
+      if (!ctx) throw new ForbiddenException('Forbidden or Month not found');
+      const {
+        month,
+        spendModeRate,
+        unresolvedChoiceCountOnCurrentWeek,
+        nextWeek,
+        lifeEventPendingForNextWeek,
+        overtimeEventPendingForNextWeek,
+        lifeEventTemplateIdToCreate,
+        overtimeEventTemplateIdToCreate,
+      } = ctx;
 
       if (month.budgetRun.userId !== userId)
-        throw new ForbiddenException('Forbidden or Month not found');
+        throw new BadRequestException('Month not found');
       if (month.currentWeek >= 5)
         throw new BadRequestException('Month already complete');
-      if (pendingCurrentWeek)
+      if (unresolvedChoiceCountOnCurrentWeek > 0)
         throw new BadRequestException('Previous week event unresolved');
 
       const config = this.configService.getConfig();
@@ -142,7 +177,9 @@ export class MonthWeekService {
           }
         : null;
 
-      const futureYouJar = month.jars.find((j) => j.jarCode === JarCode.futureYou);
+      const futureYouJar = month.jars.find(
+        (j) => j.jarCode === JarCode.futureYou,
+      );
       const futureRemainInMonth = futureYouJar
         ? jarAvailable(
             Number(futureYouJar.allocatedAmount),
@@ -152,8 +189,11 @@ export class MonthWeekService {
           )
         : 0;
 
-      const [entries, eventPending, billsFromTx, forcedRestNotice] =
-        await this.prisma.$transaction(async (tx: TxClient) => {
+      const buildPayload = (row: PendingEventWithTemplateRow) =>
+        this.eventService.buildSpawnPayload(month, row);
+
+      const [entries, pendingEvents, billsFromTx, forcedRestNotice] =
+        await this.transactionRunner.run(async (tx: TxClient) => {
           await this.monthRepository.updateMonth(
             monthIdBig,
             { currentWeek: nextWeek },
@@ -183,48 +223,48 @@ export class MonthWeekService {
             );
           }
 
-          let eventPayload: unknown = null;
-          if (!didForcedRest && existingNextWeekEvent) {
-            eventPayload = {
-              templateId: existingNextWeekEvent.template.id.toString(),
-              title: existingNextWeekEvent.template.title,
-              description: existingNextWeekEvent.template.description,
-              options: existingNextWeekEvent.template.options.map((o) => ({
-                optionId: o.id.toString(),
-                optionLabel: o.optionLabel,
-                description: o.description,
-                defaultJarCode: o.moneyJarCode,
-                moneyDelta: o.moneyDelta,
-                healthDelta: o.healthDelta,
-                lqiDelta: o.lqiDelta,
-                learningXpDelta: o.learningXpDelta,
-              })),
-            };
-          } else if (!didForcedRest && spawnTemplateId != null) {
-            const created = await this.monthRepository.createEventWithTemplate(
-              monthIdBig,
-              spawnTemplateId,
-              nextWeek,
-              tx,
-            );
-            eventPayload = {
-              templateId: created.template.id.toString(),
-              title: created.template.title,
-              description: created.template.description,
-              options: created.template.options.map((o) => ({
-                optionId: o.id.toString(),
-                optionLabel: o.optionLabel,
-                description: o.description,
-                defaultJarCode: o.moneyJarCode,
-                moneyDelta: o.moneyDelta,
-                healthDelta: o.healthDelta,
-                lqiDelta: o.lqiDelta,
-                learningXpDelta: o.learningXpDelta,
-              })),
-            };
+          const payloads: SpawnEventTemplatePayload[] = [];
+
+          if (!didForcedRest) {
+            if (lifeEventPendingForNextWeek) {
+              payloads.push(buildPayload(lifeEventPendingForNextWeek));
+            } else if (lifeEventTemplateIdToCreate != null) {
+              const created =
+                await this.monthRepository.createEventWithTemplate(
+                  monthIdBig,
+                  lifeEventTemplateIdToCreate,
+                  nextWeek,
+                  tx,
+                );
+              const row =
+                await this.monthQuery.findPendingEventWithTemplateById(
+                  created.id,
+                  tx,
+                );
+              if (row) payloads.push(buildPayload(row));
+            }
+            if (overtimeEventPendingForNextWeek) {
+              payloads.push(buildPayload(overtimeEventPendingForNextWeek));
+            } else if (overtimeEventTemplateIdToCreate != null) {
+              const created =
+                await this.monthRepository.createEventWithTemplate(
+                  monthIdBig,
+                  overtimeEventTemplateIdToCreate,
+                  nextWeek,
+                  tx,
+                );
+              const row =
+                await this.monthQuery.findPendingEventWithTemplateById(
+                  created.id,
+                  tx,
+                );
+              if (row) payloads.push(buildPayload(row));
+            }
           }
 
-          if (!eventPayload) {
+          const hasPendingEvents = payloads.length > 0;
+
+          if (!hasPendingEvents) {
             await this.indexService.resolveWeeklyIndex(
               monthIdBig,
               nextWeek,
@@ -239,14 +279,16 @@ export class MonthWeekService {
           }
 
           let billsFromTxInner: { actual: number } | null = null;
-          if (nextWeek === END_OF_MONTH_WEEK && !eventPayload) {
+          if (nextWeek === END_OF_MONTH_WEEK && !hasPendingEvents) {
             const billResult = await this.billService.computeBills(
               Number(month.budgetRunId),
               month.monthIndex,
               month.billsEstimated,
             );
             const jarsAfterSpend = month.jars.map((j) => {
-              const op = spendResult.spendOps.find((o) => o.jarCode === j.jarCode);
+              const op = spendResult.spendOps.find(
+                (o) => o.jarCode === j.jarCode,
+              );
               const add = op ? op.amount : 0;
               return {
                 ...j,
@@ -274,7 +316,7 @@ export class MonthWeekService {
 
           return [
             spendResult.entries,
-            eventPayload,
+            payloads,
             billsFromTxInner,
             forcedRestPayload,
           ] as const;
@@ -283,9 +325,10 @@ export class MonthWeekService {
       const refreshedMonth =
         await this.monthQuery.findMonthWithJars(monthIdBig);
       const monthComplete =
-        nextWeek === END_OF_MONTH_WEEK && !eventPending;
-      const bills = monthComplete ? billsFromTx ?? null : null;
-      const futureTotal = refreshedMonth?.cumulativeFutureYou ?? month.cumulativeFutureYou;
+        nextWeek === END_OF_MONTH_WEEK && pendingEvents.length === 0;
+      const bills = monthComplete ? (billsFromTx ?? null) : null;
+      const futureTotal =
+        refreshedMonth?.cumulativeFutureYou ?? month.cumulativeFutureYou;
       const freeCashBalance = refreshedMonth?.freeCash ?? month.freeCash;
       const spendingSummary: Record<string, number> = {};
       if (refreshedMonth) {
@@ -332,7 +375,7 @@ export class MonthWeekService {
         hiAfter,
         lqiAfter,
         systemNotice,
-        eventPending: eventPending ?? undefined,
+        pendingEvents: pendingEvents.length > 0 ? pendingEvents : undefined,
         monthComplete,
         bills,
         futureYouTotal: futureTotal,

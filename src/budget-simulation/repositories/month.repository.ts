@@ -33,6 +33,23 @@ export class BudgetMonthRepository {
     });
   }
 
+  /**
+   * After OT accept: increments accepted_overtime_count and overtime_income_earned for the month.
+   */
+  async incrementOvertimeAcceptOnMonth(
+    monthId: bigint,
+    overtimeIncomeDelta: number,
+    tx?: TxClient,
+  ) {
+    return this.client(tx).budgetRunMonth.update({
+      where: { id: monthId },
+      data: {
+        acceptedOvertimeCount: { increment: 1 },
+        overtimeIncomeEarned: { increment: overtimeIncomeDelta },
+      },
+    });
+  }
+
   async createBillResolution(
     data: Prisma.BudgetMonthBillResolutionUncheckedCreateInput,
     tx?: TxClient,
@@ -145,11 +162,17 @@ export class BudgetMonthRepository {
     week: number,
     tx?: TxClient,
   ) {
+    const template = await this.client(tx).lifeEventTemplate.findUniqueOrThrow({
+      where: { id: eventTemplateId },
+      select: { eventSource: true, eventSubtype: true },
+    });
     return this.client(tx).budgetMonthEvent.create({
       data: {
         budgetMonthId: monthId,
         eventTemplateId,
         week,
+        eventSource: template.eventSource,
+        eventSubtype: template.eventSubtype,
       },
       include: {
         template: {

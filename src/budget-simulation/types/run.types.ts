@@ -23,7 +23,9 @@ export type ActiveRunWithDetailsRow = Prisma.BudgetRunGetPayload<{
 }>;
 
 export type RunWithJobStateRow = Prisma.BudgetRunGetPayload<{
-  include: { jobState: { include: { job: true } } };
+  include: {
+    jobState: { include: { job: { include: { levels: true } } } };
+  };
 }>;
 
 export type RunWithLatestMonthAndCommitmentsRow = Prisma.BudgetRunGetPayload<{

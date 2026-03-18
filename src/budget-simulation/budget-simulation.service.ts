@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetSimulationSetupService } from './services/setup.service';
-import { BudgetSimulationRunService } from './services/run.service';
+import { BudgetSimulationRunService } from './services/run/run.service';
+import type { OptionalCommitmentUpdateInput } from './types/run-commitment.types';
 import { BudgetSimulationMonthService } from './services/month/month.service';
 
 /**
- * Facade for budget-simulation domain. Delegates to setup, run, and month services.
- * Keeps controller thin and single entry point per domain.
+ * Facade: controller calls here only. Run flows go to BudgetSimulationRunService
+ * (aggregate); run service delegates commitment updates to sub-service in the same file.
  */
 @Injectable()
 export class BudgetSimulationService {
@@ -64,6 +65,7 @@ export class BudgetSimulationService {
     optionId: number,
     paymentJarCode: string,
     coverJarCodes: string[] = [],
+    eventId?: number,
   ) {
     return this.monthService.applyEventChoice(
       userId,
@@ -72,10 +74,25 @@ export class BudgetSimulationService {
       optionId,
       paymentJarCode,
       coverJarCodes,
+      eventId,
     );
   }
 
   async prepareNextMonth(userId: string, runId: number) {
     return this.runService.prepareNextMonth(userId, runId);
+  }
+
+  async updateRunCommitments(
+    userId: string,
+    runId: number,
+    commitmentAmounts: Record<number, number>,
+    optionals?: OptionalCommitmentUpdateInput[],
+  ) {
+    return this.runService.updateRunCommitments(
+      userId,
+      runId,
+      commitmentAmounts,
+      optionals,
+    );
   }
 }

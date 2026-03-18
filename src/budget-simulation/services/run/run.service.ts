@@ -6,39 +6,61 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { wrapAsync } from '@common/utils/async.utils';
-import { BudgetRunQuery } from '../queries/run.query';
+import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
 import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
-import { BudgetMonthQuery } from '../queries/month.query';
-import { BudgetMonthRepository } from '../repositories/month.repository';
-import { CommitmentQuery } from '../queries/commitment.query';
+import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
+import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
+import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import {
   BillReserveOptionCode,
   CommitmentLayer,
   JarCode,
-} from '../budget-simulation.enum';
-import { BILL_RESERVE_OPTIONS, FREE_CASH_CODE } from '../budget-simulation.constant';
-import { PrismaService } from '@app/prisma/prisma.service';
-import { resolveLqiState } from '../budget-simulation.helpers';
-import { BudgetSimulationConfigService } from './config.service';
-import { TxClient } from '../budget-simulation.constant';
+} from '@budget-simulation/budget-simulation.enum';
+import { BILL_RESERVE_OPTIONS, FREE_CASH_CODE } from '@budget-simulation/budget-simulation.constant';
+import { resolveLqiState } from '@budget-simulation/budget-simulation.helpers';
+import { BudgetSimulationConfigService } from '../config.service';
+import type {
+  OptionalCommitmentUpdateInput,
+  UpdateRunCommitmentsResult,
+} from '@budget-simulation/types/run-commitment.types';
+import { BudgetSimulationRunCommitmentService } from './run-commitment.service';
+import {
+  calculateMonthIncome,
+  resolveBaseJobIncome,
+} from '@budget-simulation/domain';
+import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
 
 /**
- * Run lifecycle: active run, start run, start month, prepare next month.
- * Uses Query for reads, Repository for writes; transactions at service layer.
+ * Aggregate run service. Sub-services live under services/run/ (e.g. run-commitment.service).
  */
 @Injectable()
 export class BudgetSimulationRunService {
   private readonly logger = new Logger(BudgetSimulationRunService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly transactionRunner: TransactionRunner,
     private readonly runQuery: BudgetRunQuery,
     private readonly runRepository: BudgetRunRepository,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
     private readonly commitmentQuery: CommitmentQuery,
     private readonly configService: BudgetSimulationConfigService,
+    private readonly runCommitments: BudgetSimulationRunCommitmentService,
   ) {}
+
+  async updateRunCommitments(
+    userId: string,
+    runId: number,
+    commitmentAmounts: Record<number, number>,
+    optionals?: OptionalCommitmentUpdateInput[],
+  ): Promise<UpdateRunCommitmentsResult> {
+    return this.runCommitments.updateRunCommitments(
+      userId,
+      runId,
+      commitmentAmounts,
+      optionals,
+    );
+  }
 
   /**
    * Returns bill reserve coverage percentage for a given option code.
@@ -81,11 +103,18 @@ export class BudgetSimulationRunService {
       const run = await this.runQuery.findActiveRunWithDetails(userId);
       if (!run) return null;
 
-      const housingId = run.commitments.find(
+      const activeMonthIndex = run.months[0]?.monthIndex ?? 1;
+      const activeCommitments =
+        await this.runQuery.findActiveCommitmentsForMonth(
+          run.id,
+          activeMonthIndex,
+        );
+
+      const housingId = activeCommitments.find(
         (c) => c.template.category === 'housing',
       )?.template.id;
       const [billTemplates, housingUtilityModifiers] = await Promise.all([
-        this.commitmentQuery.findBillTemplates(3),
+        this.commitmentQuery.findBillTemplates(run.moduleId),
         housingId
           ? this.commitmentQuery.findHousingModifiersByCommitmentIds([
               housingId,
@@ -140,7 +169,7 @@ export class BudgetSimulationRunService {
         spendMode: latestMonth?.spendModeCode,
         billReserveOption: latestMonth?.billReserveOptionCode,
         commitments: [
-          ...run.commitments.map((c) => ({
+          ...activeCommitments.map((c) => ({
             templateId: c.commitmentTemplateId.toString(),
             name: c.template.name,
             layer: c.template.layer,
@@ -182,9 +211,10 @@ export class BudgetSimulationRunService {
       ]);
       if (!job) throw new NotFoundException('Job not found');
 
-      const income = job.levels[0]?.incomeBaseOverride ?? job.baseMonthlyIncome;
+      const level1 = job.levels[0] ?? null;
+      const income = resolveBaseJobIncome(job, level1);
 
-      const result = await this.prisma.$transaction(async (tx) => {
+      const result = await this.transactionRunner.run(async (tx) => {
         let state = jobState;
         if (!state) {
           state = await this.runRepository.createUserJobState(
@@ -214,7 +244,7 @@ export class BudgetSimulationRunService {
           {
             userId,
             moduleId,
-            jobStateId: state.id,
+            jobStateId: state?.id ?? 0,
             totalMonths: 0,
             finalFutureYouSavings: 0,
             passed: false,
@@ -227,7 +257,8 @@ export class BudgetSimulationRunService {
             budgetRunId: run.id,
             commitmentTemplateId: BigInt(templateId),
             selectedAmount: amount,
-            effectiveFrom: 1,
+            effectiveFromMonthIndex: 1,
+            effectiveToMonthIndex: null,
           }),
         );
 
@@ -235,7 +266,7 @@ export class BudgetSimulationRunService {
 
         return {
           runId: run.id.toString(),
-          jobStateId: state.id.toString(),
+          jobStateId: state?.id.toString() ?? '0',
         };
       });
       return result;
@@ -262,10 +293,12 @@ export class BudgetSimulationRunService {
 
       const covPct = this.getBillReserveCoveragePctSync(billReserveOptionCode);
 
-      const [prevMonth, commitments] = await Promise.all([
-        this.monthQuery.findPreviousMonth(runIdBig),
-        this.runQuery.findCommitmentsForRunWithTemplates(runIdBig),
-      ]);
+      const prevMonth = await this.monthQuery.findPreviousMonth(runIdBig);
+      const monthIndex = (prevMonth?.monthIndex ?? 0) + 1;
+      const commitments = await this.runQuery.findActiveCommitmentsForMonth(
+        runIdBig,
+        monthIndex,
+      );
 
       const coreJars = Object.values(JarCode) as string[];
       let prevMonthFreeCashBalance = 0;
@@ -309,10 +342,12 @@ export class BudgetSimulationRunService {
           const target = allocations[jar] ?? 0;
           const remain = prevJarBalances[jar] ?? 0;
           jarsRefillNeeded[jar] = Math.max(0, target - remain);
+          if (jar === JarCode.futureYou) {
+            jarsRefillNeeded[jar] = target;
+          }
         }
       }
 
-      const monthIndex = (prevMonth?.monthIndex ?? 0) + 1;
       const hiStart =
         prevMonth?.indexResolution?.hiEnd ??
         prevMonth?.indexResolution?.hiStart ??
@@ -338,10 +373,7 @@ export class BudgetSimulationRunService {
 
       const [housingUtilityModifiers, billTemplates] = await Promise.all([
         this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds),
-        this.commitmentQuery.findBillTemplatesByLayer(
-          3,
-          CommitmentLayer.bills,
-        ),
+        this.commitmentQuery.findBillTemplatesByLayer(3, CommitmentLayer.bills),
       ]);
 
       const billsEstimated = billTemplates.reduce((sum, t) => {
@@ -351,7 +383,17 @@ export class BudgetSimulationRunService {
         return sum + t.baseMonthlyAmount * (Number(modifier?.multiplier) ?? 1);
       }, 0);
 
-      const income = Number(run.jobState.currentMonthlyIncome);
+      const job = run.jobState.job;
+      const level =
+        job.levels.find((l) => l.level === run.jobState.level) ?? job.levels[0];
+      const prevOt = prevMonth
+        ? Number(prevMonth.overtimeIncomeEarned ?? 0)
+        : 0;
+      const income = calculateMonthIncome({
+        job,
+        jobLevel: level,
+        previousMonthOvertimeIncomeEarned: prevOt,
+      });
 
       const billReserveTarget = Math.round((covPct / 100) * billsEstimated);
       const topUpNeeded = Math.max(0, billReserveTarget - billReserveStart);
@@ -379,7 +421,7 @@ export class BudgetSimulationRunService {
         prevMonthFreeCashBalance + monthFreeCash,
       );
 
-      const result = await this.prisma.$transaction(async (tx) => {
+      const result = await this.transactionRunner.run(async (tx) => {
         const month = await this.monthRepository.createMonth(
           {
             budgetRunId: BigInt(runId),
@@ -387,7 +429,7 @@ export class BudgetSimulationRunService {
             income,
             lockedCommitmentsTotal: lockedTotal,
             billsEstimated,
-            billsActual: 0,
+            billsActual: null,
             billReserveOptionCode,
             spendModeCode,
             cumulativeFutureYou: prevMonth?.cumulativeFutureYou ?? 0,
@@ -423,6 +465,12 @@ export class BudgetSimulationRunService {
         );
 
         await this.upsertMonthAllocations(month.id, allocations, tx);
+
+        await this.runRepository.updateUserJobState(
+          run.jobState.id,
+          { currentMonthlyIncome: income, updatedAt: new Date() },
+          tx,
+        );
 
         return {
           monthId: month.id.toString(),
@@ -470,36 +518,43 @@ export class BudgetSimulationRunService {
         throw new BadRequestException('Current month not fully resolved');
       }
 
-      const jobState = run.jobState;
-      const baseIncome = Number(jobState.currentMonthlyIncome);
+      const nextMonthIndex = latestMonth.monthIndex + 1;
+      const nextMonthCommitments =
+        await this.runQuery.findActiveCommitmentsForMonth(
+          runIdBig,
+          nextMonthIndex,
+        );
 
+      const jobState = run.jobState;
       const currentLevel =
         jobState.job.levels.find((l) => l.level === jobState.level) ||
         jobState.job.levels[0];
-      const otPayPerUnit =
-        currentLevel?.overtimeIncomePerUnit ??
-        jobState.job.overtimeIncomePerUnit;
-
-      const overtimeUnits = 0;
-      const overtimePay = overtimeUnits * Number(otPayPerUnit ?? 0);
+      const resolvedBase = resolveBaseJobIncome(jobState.job, currentLevel);
+      const overtimeCarriedFromPriorMonth = Number(
+        latestMonth.overtimeIncomeEarned ?? 0,
+      );
       const absenceDeduction =
         latestMonth.indexResolution?.incomeLossFromForcedRest ?? 0;
-      const finalIncome = baseIncome + overtimePay - absenceDeduction;
+      const grossNextMonthIncome =
+        resolvedBase + overtimeCarriedFromPriorMonth;
+      const finalIncome = grossNextMonthIncome - absenceDeduction;
 
-      const lockedTotal = run.commitments
-        .filter((c) => c.template.layer === CommitmentLayer.locked)
+      const lockedTotal = nextMonthCommitments
+        .filter(
+          (c) =>
+            c.template.layer === CommitmentLayer.locked ||
+            c.template.layer === CommitmentLayer.foodReserve,
+        )
         .reduce((sum, c) => sum + Number(c.selectedAmount), 0);
 
-      const billingCommitments = run.commitments.filter(
+      const billingCommitments = nextMonthCommitments.filter(
         (c) => c.template.category === 'housing',
       );
       const housingIds = billingCommitments.map((c) => c.commitmentTemplateId);
 
       const [housingUtilityModifiers, billTemplates] = await Promise.all([
         housingIds.length > 0
-          ? this.commitmentQuery.findHousingModifiersByCommitmentIds(
-              housingIds,
-            )
+          ? this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds)
           : Promise.resolve([]),
         this.commitmentQuery.findBillTemplatesByLayer(
           run.moduleId,
@@ -534,7 +589,8 @@ export class BudgetSimulationRunService {
         remaining: number;
         refill: number;
       }> = [];
-
+      let lastMonthJarsRemaining = 0;
+      let lastMonthTotalAllocated = 0;
       for (const jarCode of jarOrder) {
         const jar = latestMonth.jars.find((j) => j.jarCode === jarCode);
         const target = jar ? Number(jar.allocatedAmount) : 0;
@@ -547,31 +603,34 @@ export class BudgetSimulationRunService {
                 Number(jar.overflowOutAmount),
             )
           : 0;
-        const refill = Math.max(0, target - remaining);
+        let refill = Math.max(0, target - remaining);
+        if (jarCode === JarCode.futureYou) {
+          refill = target;
+        } else {
+          lastMonthJarsRemaining += remaining;
+        }
+        lastMonthTotalAllocated += target;
         jarRefill.push({ jarCode, target, remaining, refill });
       }
 
-      const freeCashJar = latestMonth.jars.find(
-        (j) => j.jarCode === FREE_CASH_CODE,
-      );
-      const freeCashBalance = freeCashJar
-        ? Math.max(
-            0,
-            Number(freeCashJar.allocatedAmount) -
-              Number(freeCashJar.spentAmount) +
-              Number(freeCashJar.overflowInAmount) -
-              Number(freeCashJar.overflowOutAmount),
-          )
-        : Math.max(0, Number(latestMonth.freeCash));
+      const lastMonthFreeCash = latestMonth.freeCash;
 
       const flexibleIncome =
         finalIncome - lockedTotal - estimatedBills - reserveRefill;
 
+      const nextMonthFreeCash =
+        flexibleIncome - lastMonthTotalAllocated + lastMonthJarsRemaining;
+
+      const freeCashBalance = Math.max(
+        0,
+        lastMonthFreeCash + nextMonthFreeCash,
+      );
+
       const result = {
         monthIndex: latestMonth.monthIndex + 1,
         income: {
-          baseIncome,
-          overtimePay,
+          resolvedBaseJobIncome: resolvedBase,
+          overtimeIncomeEarnedFromPriorMonth: overtimeCarriedFromPriorMonth,
           absenceDeduction,
           finalIncome,
         },
@@ -587,7 +646,11 @@ export class BudgetSimulationRunService {
           refill: reserveRefill,
         },
         jarRefill,
-        freeCash: freeCashBalance,
+        freeCash: {
+          current: lastMonthFreeCash,
+          nextMonth: nextMonthFreeCash,
+          total: freeCashBalance,
+        },
         structure: {
           flexibleIncome,
         },

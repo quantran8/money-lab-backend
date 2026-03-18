@@ -1,10 +1,13 @@
-import { Prisma } from '@prisma/client';
-
-/** Client for use inside $transaction; accepts both PrismaService and tx from $transaction callback. */
-export type TxClient = Prisma.TransactionClient;
-
 /** Module id for budget-simulation (used to load module.config at init). */
 export const BUDGET_SIMULATION_MODULE_ID = 3;
+
+/** Budget month event lane: life (LQI-weighted pool). */
+export const EVENT_SOURCE_LIFE = 'life';
+
+/** Budget month event lane: work (OT — no LQI). */
+export const EVENT_SOURCE_WORK = 'work';
+
+export const EVENT_SUBTYPE_OVERTIME = 'overtime';
 
 /** Number of weeks in a month. */
 export const NUMBER_OF_WEEKS_PER_MONTH = 4;

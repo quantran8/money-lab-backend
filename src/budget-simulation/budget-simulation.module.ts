@@ -3,7 +3,8 @@ import { BudgetController } from './budget-simulation.controller';
 import { BudgetSimulationService } from './budget-simulation.service';
 import { BudgetSimulationConfigService } from './services/config.service';
 import { BudgetSimulationSetupService } from './services/setup.service';
-import { BudgetSimulationRunService } from './services/run.service';
+import { BudgetSimulationRunCommitmentService } from './services/run/run-commitment.service';
+import { BudgetSimulationRunService } from './services/run/run.service';
 import { BudgetSimulationMonthService } from './services/month/month.service';
 import { MonthWeekService } from './services/month/month-week.service';
 import { MonthEventService } from './services/month/month-event.service';
@@ -16,11 +17,13 @@ import { CommitmentQuery } from './queries/commitment.query';
 import { ModuleQuery } from './queries/module.query';
 import { BudgetRunRepository } from './repositories/run.repository';
 import { BudgetMonthRepository } from './repositories/month.repository';
+import { TransactionRunner } from '@app/prisma/transaction.runner';
 
 @Global()
 @Module({
   controllers: [BudgetController],
   providers: [
+    TransactionRunner,
     ModuleQuery,
     BudgetSimulationConfigService,
     BudgetRunQuery,
@@ -30,6 +33,7 @@ import { BudgetMonthRepository } from './repositories/month.repository';
     BudgetMonthRepository,
     BudgetSimulationSetupService,
     BudgetSimulationRunService,
+    BudgetSimulationRunCommitmentService,
     MonthSpendService,
     MonthIndexService,
     MonthBillService,

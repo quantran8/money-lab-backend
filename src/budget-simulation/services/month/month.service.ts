@@ -27,6 +27,7 @@ export class BudgetSimulationMonthService {
     optionId: number,
     paymentJarCode: string,
     coverJarCodes: string[] = [],
+    eventId?: number,
   ) {
     return wrapAsync(this.logger, 'applyEventChoice', () =>
       this.eventService.applyChoice(
@@ -36,6 +37,7 @@ export class BudgetSimulationMonthService {
         optionId,
         paymentJarCode,
         coverJarCodes,
+        eventId,
       ),
     );
   }

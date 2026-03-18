@@ -100,8 +100,7 @@ model JobLevel {
   level                  Int
   rankLabel              String?  @map("rank_label")
   titlePrefix            String?  @map("title_prefix")
-  incomeBaseOverride     Int?     @map("income_base_override")
-  incomeMultiplierBp     Int      @default(0) @map("income_multiplier_bp")
+  incomeMultiplier       Decimal  @default(1) @map("income_multiplier") @db.Decimal(8, 4)
   incomeVarianceMin      Int?     @map("income_variance_min")
   incomeVarianceMax      Int?     @map("income_variance_max")
   overtimeIncomePerUnit  Int?     @map("overtime_income_per_unit")
@@ -110,6 +109,9 @@ model JobLevel {
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   baseEnergyLoadOverride Int      @map("base_energy_load_override")
   absenceDeductionPerDay Int?     @map("absence_deduction_per_day")
+  overtimeSpawnWeight    Decimal  @default(0) @map("overtime_spawn_weight") @db.Decimal(5, 4)
+  overtimeMonthlyCap     Int?     @map("overtime_monthly_cap")
+  minHiForOvertime       Int?     @map("min_hi_for_overtime") @db.SmallInt
   job                    Job      @relation(fields: [jobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([jobId, level])
@@ -203,8 +205,8 @@ model UserRunCommitment {
   commitmentTemplateId    BigInt             @map("commitment_template_id")
   selectedAmount          Int                @default(0) @map("selected_amount")
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  effectiveFrom           Int                @default(1) @map("effective_from")
-  cooldownUntilMonthIndex Int?               @map("cooldown_until_month_index")
+  effectiveFromMonthIndex Int                @default(1) @map("effective_from_month_index")
+  effectiveToMonthIndex   Int?               @map("effective_to_month_index")
   budgetRun               BudgetRun          @relation(fields: [budgetRunId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   template                CommitmentTemplate @relation(fields: [commitmentTemplateId], references: [id], onUpdate: NoAction)
 
@@ -259,6 +261,8 @@ model BudgetRunMonth {
   structuralOvercommitmentOccurred Boolean                    @default(false) @map("structural_overcommitment_occurred")
   stressModeActive                 Boolean                    @default(false) @map("stress_mode_active")
   freeCash                         Float                      @default(0) @map("free_cash")
+  acceptedOvertimeCount            Int                        @default(0) @map("accepted_overtime_count")
+  overtimeIncomeEarned             Int                        @default(0) @map("overtime_income_earned")
   billResolution                   BudgetMonthBillResolution?
   indexResolution                  BudgetMonthIndexResolution?
   jars                             BudgetMonthJar[]
@@ -343,6 +347,8 @@ model LifeEventTemplate {
   title       String
   description String?
   category    String?
+  eventSource String             @default("life") @map("event_source")
+  eventSubtype String?           @map("event_subtype")
   rarity      Int                @default(1) @db.SmallInt
   meta        Json               @default("{}")
   createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -379,6 +385,8 @@ model BudgetMonthEvent {
   id               BigInt            @id @default(autoincrement())
   budgetMonthId    BigInt            @map("budget_month_id")
   eventTemplateId  BigInt            @map("event_template_id")
+  eventSource      String            @default("life") @map("event_source")
+  eventSubtype     String?           @map("event_subtype")
   chosenOptionId   BigInt?           @map("chosen_option_id")
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   week             Int?              @db.SmallInt
@@ -388,6 +396,7 @@ model BudgetMonthEvent {
   template         LifeEventTemplate @relation(fields: [eventTemplateId], references: [id], onUpdate: NoAction)
 
   @@index([budgetMonthId], map: "idx_budget_month_events_month")
+  @@unique([budgetMonthId, week, eventSource], map: "uq_budget_month_events_month_week_source")
   @@index([chosenOptionId], map: "idx_budget_month_events_option")
   @@index([eventTemplateId], map: "idx_budget_month_events_template")
   @@map("budget_month_events")

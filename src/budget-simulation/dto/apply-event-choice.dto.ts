@@ -25,6 +25,13 @@ export class ApplyEventChoiceDto {
     @Type(() => Number)
     optionId: number;
 
+    /** When multiple pending events in the same week (module 3), target this budget_month_events row. */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Type(() => Number)
+    eventId?: number;
+
     /** Jar selected for payment (primary). UI may preselect from option.default_jar_code. */
     @IsString()
     paymentJarCode: string;

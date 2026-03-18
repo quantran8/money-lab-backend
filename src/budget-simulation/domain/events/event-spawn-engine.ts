@@ -18,6 +18,15 @@ export function shouldSpawn(seed: string): boolean {
 }
 
 /**
+ * Lane spawn roll: true if roll &lt; probability. probability in (0, 1]; 0 or negative never spawns.
+ */
+export function shouldSpawnLane(seed: string, probability: number): boolean {
+  if (probability <= 0) return false;
+  const p = Math.min(1, probability);
+  return deterministicRandom(seed) < p;
+}
+
+/**
  * Picks category by weight from seed. Weights must have length > 0.
  */
 export function chooseCategory(
