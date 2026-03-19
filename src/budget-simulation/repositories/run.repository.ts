@@ -95,6 +95,26 @@ export class BudgetRunRepository {
     });
   }
 
+  async completeRun(
+    runId: bigint,
+    data: {
+      totalMonths: number;
+      finalFutureYouSavings: number;
+      passed: boolean;
+    },
+    tx?: TxClient,
+  ) {
+    return this.client(tx).budgetRun.update({
+      where: { id: runId },
+      data: {
+        finishedAt: new Date(),
+        totalMonths: data.totalMonths,
+        finalFutureYouSavings: data.finalFutureYouSavings,
+        passed: data.passed,
+      },
+    });
+  }
+
   /**
    * Updates one run commitment: selectedAmount and effective range (from next month).
    * Row must exist (runId + commitmentTemplateId).

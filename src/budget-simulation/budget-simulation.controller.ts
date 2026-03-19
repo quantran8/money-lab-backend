@@ -77,13 +77,13 @@ export class BudgetController {
     return this.budgetService.getActiveBudgetRun(getUserId(req));
   }
 
-  @Post('run/:runId/prepare-next-month')
-  prepareNextMonth(
-    @Request() req: { user?: { id: string } },
-    @Param('runId') runId: string,
-  ) {
-    return this.budgetService.prepareNextMonth(getUserId(req), parseInt(runId));
-  }
+  // @Post('run/:runId/prepare-next-month')
+  // prepareNextMonth(
+  //   @Request() req: { user?: { id: string } },
+  //   @Param('runId') runId: string,
+  // ) {
+  //   return this.budgetService.prepareNextMonth(getUserId(req), parseInt(runId));
+  // }
 
   @Post('run/:runId/commitments')
   updateRunCommitments(

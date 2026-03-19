@@ -12,6 +12,13 @@ export const EVENT_SUBTYPE_OVERTIME = 'overtime';
 /** Number of weeks in a month. */
 export const NUMBER_OF_WEEKS_PER_MONTH = 4;
 
+export const WEEK_INDEX_COMPLETE_MONTH = 5;
+
+/** Maximum number of total events per week. */
+export const MAX_EVENTS_PER_WEEK = 1;
+
+export const RUN_MONTH_INDEX_COMPLETE = 6;
+
 /** Week number for the end of the month. */
 export const END_OF_MONTH_WEEK = NUMBER_OF_WEEKS_PER_MONTH;
 
@@ -21,6 +28,14 @@ export const BILL_RESERVE_OPTIONS = [
   { code: 'high', coveragePct: 75, label: '75%' },
   { code: 'full', coveragePct: 100, label: '100%' },
 ] as const;
+
+/** Returns bill reserve coverage percentage for a given option code. */
+export function getBillReserveCoveragePct(code: string): number {
+  const option = BILL_RESERVE_OPTIONS.find((x) => x.code === code);
+  if (!option)
+    throw new Error(`Invalid bill_reserve_option_code: ${code}`);
+  return option.coveragePct;
+}
 
 export const SPEND_MODE_OPTIONS = [
   { code: 'enjoy', rate: 1.0, label: 'Enjoy' },

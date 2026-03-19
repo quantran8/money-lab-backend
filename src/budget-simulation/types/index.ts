@@ -13,6 +13,7 @@ export type {
   IndexWeeklyResolutionResult,
   ReconcileBillsJarInput,
   ReconcileBillsContext,
+  NextMonthPreview,
 } from './month.types';
 export type {
   LifeEventTemplateRow,

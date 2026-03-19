@@ -206,6 +206,20 @@ export class BudgetMonthQuery {
     });
   }
 
+  /** Count all events (pending + resolved) for a week. */
+  async countEventsForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<number> {
+    return this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        week,
+      },
+    });
+  }
+
   /** Count unresolved events for a week (module 3 may have two). */
   async countPendingEventsForWeek(
     monthId: bigint,
@@ -356,20 +370,44 @@ export class BudgetMonthQuery {
     >;
   }
 
-  /** True if this week already has a life-lane event (pending or resolved). */
-  async hasLifeLaneEventForWeek(
+  /** Count life-lane events for this week (pending or resolved). */
+  async countLifeLaneEventsForWeek(
     monthId: bigint,
     week: number,
     tx?: TxClient,
-  ): Promise<boolean> {
-    const n = await this.client(tx).budgetMonthEvent.count({
+  ): Promise<number> {
+    return this.client(tx).budgetMonthEvent.count({
       where: {
         budgetMonthId: monthId,
         week,
         eventSource: EVENT_SOURCE_LIFE,
       },
     });
-    return n > 0;
+  }
+
+  /** True if this week already has a life-lane event (pending or resolved). */
+  async hasLifeLaneEventForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<boolean> {
+    return (await this.countLifeLaneEventsForWeek(monthId, week, tx)) > 0;
+  }
+
+  /** Count OT events for this week. */
+  async countOvertimeEventsForWeek(
+    monthId: bigint,
+    week: number,
+    tx?: TxClient,
+  ): Promise<number> {
+    return this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        week,
+        eventSource: EVENT_SOURCE_WORK,
+        eventSubtype: EVENT_SUBTYPE_OVERTIME,
+      },
+    });
   }
 
   /** True if this week already has an OT event. */
@@ -378,15 +416,7 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<boolean> {
-    const n = await this.client(tx).budgetMonthEvent.count({
-      where: {
-        budgetMonthId: monthId,
-        week,
-        eventSource: EVENT_SOURCE_WORK,
-        eventSubtype: EVENT_SUBTYPE_OVERTIME,
-      },
-    });
-    return n > 0;
+    return (await this.countOvertimeEventsForWeek(monthId, week, tx)) > 0;
   }
 
   /** Count events created for this month (for max_event_count_per_month cap). Pass tx when inside a transaction. */

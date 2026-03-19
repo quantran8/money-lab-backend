@@ -8,16 +8,24 @@ import { wrapAsync } from '@common/utils/async.utils';
 import { clampHi, clampLqi } from '@app/budget-simulation/budget-simulation.helpers';
 import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
+import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
 import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
-import { END_OF_MONTH_WEEK } from '@budget-simulation/budget-simulation.constant';
+import {
+  END_OF_MONTH_WEEK,
+  MAX_EVENTS_PER_WEEK,
+  RUN_MONTH_INDEX_COMPLETE,
+  WEEK_INDEX_COMPLETE_MONTH,
+} from '@budget-simulation/budget-simulation.constant';
 import { jarAvailable } from '@budget-simulation/domain';
 import { MonthSpendService } from './month-spend.service';
 import { MonthEventService } from './month-event.service';
 import { MonthIndexService } from './month-index.service';
 import { MonthBillService } from './month-bill.service';
+import { NextMonthPreviewService } from './next-month-preview.service';
 import { BudgetSimulationConfigService } from '../config.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
+  NextMonthPreview,
   PendingEventWithTemplateRow,
   SpawnEventTemplatePayload,
 } from '@budget-simulation/types';
@@ -58,6 +66,8 @@ export class MonthWeekService {
     private readonly eventService: MonthEventService,
     private readonly indexService: MonthIndexService,
     private readonly billService: MonthBillService,
+    private readonly previewService: NextMonthPreviewService,
+    private readonly runRepository: BudgetRunRepository,
   ) {}
 
   async loadResolveWeekContext(
@@ -85,23 +95,40 @@ export class MonthWeekService {
       spendModeRate,
       lifeEventPendingForNextWeek,
       overtimeEventPendingForNextWeek,
-      lifeEventTemplateIdToCreate,
-      overtimeEventTemplateIdToCreate,
+      totalEventCount,
     ] = await Promise.all([
       spendModeRatePromise,
       this.monthQuery.findPendingLifeEventWithTemplate(monthId, nextWeek),
       this.monthQuery.findPendingOvertimeEventWithTemplate(monthId, nextWeek),
-      !(await this.monthQuery.hasLifeLaneEventForWeek(monthId, nextWeek))
-        ? this.eventService.resolveLifeSpawnTemplateId(monthId, month, nextWeek)
-        : Promise.resolve(null),
-      !(await this.monthQuery.hasOvertimeEventForWeek(monthId, nextWeek))
-        ? this.eventService.resolveOvertimeSpawnTemplateId(
+      this.monthQuery.countEventsForWeek(monthId, nextWeek),
+    ]);
+
+    let lifeEventTemplateIdToCreate: bigint | null = null;
+    let overtimeEventTemplateIdToCreate: bigint | null = null;
+
+    if (totalEventCount < MAX_EVENTS_PER_WEEK) {
+      // Life lane has priority; only try overtime if cap not yet reached
+      lifeEventTemplateIdToCreate = !lifeEventPendingForNextWeek
+        ? await this.eventService.resolveLifeSpawnTemplateId(
             monthId,
             month,
             nextWeek,
           )
-        : Promise.resolve(null),
-    ]);
+        : null;
+
+      const usedSlots =
+        totalEventCount + (lifeEventTemplateIdToCreate != null ? 1 : 0);
+
+      if (usedSlots < MAX_EVENTS_PER_WEEK) {
+        overtimeEventTemplateIdToCreate = !overtimeEventPendingForNextWeek
+          ? await this.eventService.resolveOvertimeSpawnTemplateId(
+              monthId,
+              month,
+              nextWeek,
+            )
+          : null;
+      }
+    }
 
     return {
       month,
@@ -119,7 +146,7 @@ export class MonthWeekService {
     return wrapAsync(this.logger, 'resolveWeek', async () => {
       const monthIdBig = BigInt(monthId);
       const ctx = await this.loadResolveWeekContext(monthIdBig);
-      if (!ctx) throw new ForbiddenException('Forbidden or Month not found');
+      if (!ctx) throw new BadRequestException('Month not found');
       const {
         month,
         spendModeRate,
@@ -133,7 +160,7 @@ export class MonthWeekService {
 
       if (month.budgetRun.userId !== userId)
         throw new BadRequestException('Month not found');
-      if (month.currentWeek >= 5)
+      if (month.currentWeek >= WEEK_INDEX_COMPLETE_MONTH)
         throw new BadRequestException('Month already complete');
       if (unresolvedChoiceCountOnCurrentWeek > 0)
         throw new BadRequestException('Previous week event unresolved');
@@ -337,6 +364,29 @@ export class MonthWeekService {
         }
       }
 
+      let nextMonthPreview: NextMonthPreview | undefined;
+      let runComplete = false;
+
+      if (monthComplete) {
+        if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
+          await this.runRepository.completeRun(month.budgetRunId, {
+            totalMonths: month.monthIndex,
+            finalFutureYouSavings: futureTotal,
+            passed: true,
+          });
+          runComplete = true;
+        } else {
+          const fullMonth =
+            await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
+              monthIdBig,
+            );
+          if (fullMonth) {
+            nextMonthPreview =
+              await this.previewService.computePreview(fullMonth);
+          }
+        }
+      }
+
       const hiAfter = clampHi(
         Number(
           refreshedMonth?.indexResolution?.hiEnd ??
@@ -377,10 +427,12 @@ export class MonthWeekService {
         systemNotice,
         pendingEvents: pendingEvents.length > 0 ? pendingEvents : undefined,
         monthComplete,
+        runComplete,
         bills,
         futureYouTotal: futureTotal,
         freeCashBalance,
         spendingSummary,
+        nextMonthPreview,
       };
     });
   }

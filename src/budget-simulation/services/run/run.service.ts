@@ -12,18 +12,23 @@ import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
 import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import {
-  BillReserveOptionCode,
   CommitmentLayer,
   JarCode,
 } from '@budget-simulation/budget-simulation.enum';
-import { BILL_RESERVE_OPTIONS, FREE_CASH_CODE } from '@budget-simulation/budget-simulation.constant';
+import {
+  BILL_RESERVE_OPTIONS,
+  FREE_CASH_CODE,
+  WEEK_INDEX_COMPLETE_MONTH,
+} from '@budget-simulation/budget-simulation.constant';
 import { resolveLqiState } from '@budget-simulation/budget-simulation.helpers';
 import { BudgetSimulationConfigService } from '../config.service';
 import type {
   OptionalCommitmentUpdateInput,
   UpdateRunCommitmentsResult,
 } from '@budget-simulation/types/run-commitment.types';
+import type { NextMonthPreview } from '@budget-simulation/types/month.types';
 import { BudgetSimulationRunCommitmentService } from './run-commitment.service';
+import { NextMonthPreviewService } from '../month/next-month-preview.service';
 import {
   calculateMonthIncome,
   resolveBaseJobIncome,
@@ -46,6 +51,7 @@ export class BudgetSimulationRunService {
     private readonly commitmentQuery: CommitmentQuery,
     private readonly configService: BudgetSimulationConfigService,
     private readonly runCommitments: BudgetSimulationRunCommitmentService,
+    private readonly previewService: NextMonthPreviewService,
   ) {}
 
   async updateRunCommitments(
@@ -156,13 +162,29 @@ export class BudgetSimulationRunService {
         (latestMonth?.billsEstimated ?? 0) +
         (latestMonth?.billResolution?.billReserveTarget ?? 0);
 
+      const isMonthResolved = latestMonth
+        ? latestMonth.billsActual !== null
+        : false;
+
+      let nextMonthPreview: NextMonthPreview | undefined;
+      if (isMonthResolved && latestMonth) {
+        const fullMonth =
+          await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
+            latestMonth.id,
+          );
+        if (fullMonth) {
+          nextMonthPreview =
+            await this.previewService.computePreview(fullMonth);
+        }
+      }
+
       const result = {
         id: run.id.toString(),
         moduleId: run.moduleId,
         userId: run.userId,
         jobId: run.jobState.jobId.toString(),
         currentMonthIndex: latestMonth?.monthIndex ?? 1,
-        isMonthResolved: latestMonth ? latestMonth.billsActual !== null : false,
+        isMonthResolved,
         freeCash: freeCashBalance,
         income: latestMonth?.income ?? 0,
         necessitiesTotal,
@@ -192,6 +214,7 @@ export class BudgetSimulationRunService {
           },
           {} as Record<string, { allocation: number; balance: number }>,
         ),
+        nextMonthPreview,
       };
       return result;
     });
@@ -409,17 +432,15 @@ export class BudgetSimulationRunService {
         (sum, val) => sum + val,
         0,
       );
-      if (allocSum > leftToAllocate)
-        throw new BadRequestException(
-          'Overspending: allocations > left_to_allocate',
-        );
 
       const monthFreeCash = leftToAllocate - allocSum;
 
-      const cumulativeFreeCash = Math.max(
-        0,
-        prevMonthFreeCashBalance + monthFreeCash,
-      );
+      const cumulativeFreeCash = prevMonthFreeCashBalance + monthFreeCash;
+
+      if (allocSum > leftToAllocate && cumulativeFreeCash < 0)
+        throw new BadRequestException(
+          'Overspending: allocations > left_to_allocate',
+        );
 
       const result = await this.transactionRunner.run(async (tx) => {
         const month = await this.monthRepository.createMonth(
@@ -513,149 +534,18 @@ export class BudgetSimulationRunService {
       if (
         !latestMonth ||
         latestMonth.billsActual === null ||
-        latestMonth.currentWeek < 5
+        latestMonth.currentWeek < WEEK_INDEX_COMPLETE_MONTH
       ) {
         throw new BadRequestException('Current month not fully resolved');
       }
 
-      const nextMonthIndex = latestMonth.monthIndex + 1;
-      const nextMonthCommitments =
-        await this.runQuery.findActiveCommitmentsForMonth(
-          runIdBig,
-          nextMonthIndex,
+      const fullMonth =
+        await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
+          latestMonth.id,
         );
+      if (!fullMonth) throw new NotFoundException('Month not found');
 
-      const jobState = run.jobState;
-      const currentLevel =
-        jobState.job.levels.find((l) => l.level === jobState.level) ||
-        jobState.job.levels[0];
-      const resolvedBase = resolveBaseJobIncome(jobState.job, currentLevel);
-      const overtimeCarriedFromPriorMonth = Number(
-        latestMonth.overtimeIncomeEarned ?? 0,
-      );
-      const absenceDeduction =
-        latestMonth.indexResolution?.incomeLossFromForcedRest ?? 0;
-      const grossNextMonthIncome =
-        resolvedBase + overtimeCarriedFromPriorMonth;
-      const finalIncome = grossNextMonthIncome - absenceDeduction;
-
-      const lockedTotal = nextMonthCommitments
-        .filter(
-          (c) =>
-            c.template.layer === CommitmentLayer.locked ||
-            c.template.layer === CommitmentLayer.foodReserve,
-        )
-        .reduce((sum, c) => sum + Number(c.selectedAmount), 0);
-
-      const billingCommitments = nextMonthCommitments.filter(
-        (c) => c.template.category === 'housing',
-      );
-      const housingIds = billingCommitments.map((c) => c.commitmentTemplateId);
-
-      const [housingUtilityModifiers, billTemplates] = await Promise.all([
-        housingIds.length > 0
-          ? this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds)
-          : Promise.resolve([]),
-        this.commitmentQuery.findBillTemplatesByLayer(
-          run.moduleId,
-          CommitmentLayer.bills,
-        ),
-      ]);
-
-      const estimatedBills = billTemplates.reduce((sum, t) => {
-        const modifier = housingUtilityModifiers.find(
-          (m) => m.utilityName.toLowerCase() === t.name.toLowerCase(),
-        );
-        return sum + t.baseMonthlyAmount * (Number(modifier?.multiplier) ?? 1);
-      }, 0);
-
-      const optionCode =
-        latestMonth.billReserveOptionCode || BillReserveOptionCode.high;
-      const covPct = this.getBillReserveCoveragePctSync(optionCode);
-      const reserveTarget = Math.round((covPct / 100) * estimatedBills);
-      const reserveStart = latestMonth.billResolution?.billReserveEnd ?? 0;
-      const reserveRefill = Math.max(0, reserveTarget - reserveStart);
-
-      const jarOrder = [
-        JarCode.fun,
-        JarCode.learning,
-        JarCode.give,
-        JarCode.futureYou,
-      ];
-
-      const jarRefill: Array<{
-        jarCode: string;
-        target: number;
-        remaining: number;
-        refill: number;
-      }> = [];
-      let lastMonthJarsRemaining = 0;
-      let lastMonthTotalAllocated = 0;
-      for (const jarCode of jarOrder) {
-        const jar = latestMonth.jars.find((j) => j.jarCode === jarCode);
-        const target = jar ? Number(jar.allocatedAmount) : 0;
-        const remaining = jar
-          ? Math.max(
-              0,
-              target -
-                Number(jar.spentAmount) +
-                Number(jar.overflowInAmount) -
-                Number(jar.overflowOutAmount),
-            )
-          : 0;
-        let refill = Math.max(0, target - remaining);
-        if (jarCode === JarCode.futureYou) {
-          refill = target;
-        } else {
-          lastMonthJarsRemaining += remaining;
-        }
-        lastMonthTotalAllocated += target;
-        jarRefill.push({ jarCode, target, remaining, refill });
-      }
-
-      const lastMonthFreeCash = latestMonth.freeCash;
-
-      const flexibleIncome =
-        finalIncome - lockedTotal - estimatedBills - reserveRefill;
-
-      const nextMonthFreeCash =
-        flexibleIncome - lastMonthTotalAllocated + lastMonthJarsRemaining;
-
-      const freeCashBalance = Math.max(
-        0,
-        lastMonthFreeCash + nextMonthFreeCash,
-      );
-
-      const result = {
-        monthIndex: latestMonth.monthIndex + 1,
-        income: {
-          resolvedBaseJobIncome: resolvedBase,
-          overtimeIncomeEarnedFromPriorMonth: overtimeCarriedFromPriorMonth,
-          absenceDeduction,
-          finalIncome,
-        },
-        commitments: {
-          lockedTotal,
-        },
-        bills: {
-          estimated: estimatedBills,
-        },
-        billReserve: {
-          target: reserveTarget,
-          start: reserveStart,
-          refill: reserveRefill,
-        },
-        jarRefill,
-        freeCash: {
-          current: lastMonthFreeCash,
-          nextMonth: nextMonthFreeCash,
-          total: freeCashBalance,
-        },
-        structure: {
-          flexibleIncome,
-        },
-      };
-      return result;
+      return this.previewService.computePreview(fullMonth);
     });
   }
 }

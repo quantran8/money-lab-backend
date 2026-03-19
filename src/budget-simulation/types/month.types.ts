@@ -125,6 +125,28 @@ export interface ReconcileBillsJarInput {
   overflowOutAmount: unknown;
 }
 
+/** Next-month financial preview returned when monthComplete === true. */
+export interface NextMonthPreview {
+  monthIndex: number;
+  income: {
+    resolvedBaseJobIncome: number;
+    overtimeIncomeEarnedFromPriorMonth: number;
+    absenceDeduction: number;
+    finalIncome: number;
+  };
+  commitments: { lockedTotal: number };
+  bills: { estimated: number };
+  billReserve: { target: number; start: number; refill: number };
+  jarRefill: Array<{
+    jarCode: string;
+    target: number;
+    remaining: number;
+    refill: number;
+  }>;
+  freeCash: { current: number; nextMonth: number; total: number };
+  structure: { flexibleIncome: number };
+}
+
 /** Preloaded month + jars for reconcileBillsWithContext. */
 export interface ReconcileBillsContext {
   month: MonthWithRun;

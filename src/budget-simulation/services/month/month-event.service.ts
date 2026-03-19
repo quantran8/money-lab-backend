@@ -16,6 +16,7 @@ import {
   EVENT_SOURCE_WORK,
   EVENT_SUBTYPE_OVERTIME,
   FREE_CASH_CODE,
+  RUN_MONTH_INDEX_COMPLETE,
 } from '@budget-simulation/budget-simulation.constant';
 import {
   chooseCategory,
@@ -29,9 +30,11 @@ import type { ChosenEventsTotalsResult } from '@budget-simulation/types';
 import { MonthSpendService } from './month-spend.service';
 import { MonthIndexService } from './month-index.service';
 import { MonthBillService } from './month-bill.service';
+import { NextMonthPreviewService } from './next-month-preview.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
   MonthWithRunAndJars,
+  NextMonthPreview,
   LifeEventTemplateRow,
   SpawnEventTemplatePayload,
   PendingEventWithTemplateRow,
@@ -60,6 +63,7 @@ export class MonthEventService {
     private readonly spendService: MonthSpendService,
     private readonly indexService: MonthIndexService,
     private readonly billService: MonthBillService,
+    private readonly previewService: NextMonthPreviewService,
   ) {}
 
   /**
@@ -702,6 +706,30 @@ export class MonthEventService {
           config,
         );
 
+    let nextMonthPreview: NextMonthPreview | undefined;
+    let runComplete = false;
+
+    if (txResult.monthComplete) {
+      if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
+        await this.runRepository.completeRun(
+          month.budgetRunId,
+          {
+            totalMonths: month.monthIndex,
+            finalFutureYouSavings: txResult.futureYouTotal,
+            passed: true,
+          },
+        );
+        runComplete = true;
+      } else {
+        const fullMonth =
+          await this.monthQuery.findMonthWithRunAndJobLevelAndJars(monthIdBig);
+        if (fullMonth) {
+          nextMonthPreview =
+            await this.previewService.computePreview(fullMonth);
+        }
+      }
+    }
+
     return {
       eventId: Number(event.id),
       optionId: optionId,
@@ -715,6 +743,7 @@ export class MonthEventService {
       hiAfter,
       lqiAfter,
       monthComplete: txResult.monthComplete,
+      runComplete,
       bills: txResult.bills,
       futureYouTotal: txResult.futureYouTotal,
       futureRemainInMonth,
@@ -723,6 +752,7 @@ export class MonthEventService {
       overtimeIncomeAccruedToNextMonth: isOtAccept
         ? overtimeIncomeAccruedToNextMonth
         : undefined,
+      nextMonthPreview,
     };
   }
 }

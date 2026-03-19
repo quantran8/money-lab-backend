@@ -1,7 +1,7 @@
+import { TxClient } from '@app/prisma/transaction.runner';
 import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '@prisma/prisma.service';
-import type { TxClient } from '../budget-simulation.constant';
 
 /**
  * Write operations for budget months, bill/index resolution, jars, and events.
