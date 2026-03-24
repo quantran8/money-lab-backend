@@ -38,6 +38,7 @@ export {
   chooseCategory,
   chooseTemplate,
   chooseTemplateIfSpawn,
+  filterAffordableTemplates,
   shouldSpawn,
   shouldSpawnLane,
 } from './events/event-spawn-engine';

@@ -12,7 +12,6 @@ import type {
   MonthWithRunAndJobLevel,
   MonthWithRunAndJobLevelAndJars,
   MonthWithJars,
-  MonthWithRunAndJars,
   MonthWithRunAndModule,
   BudgetMonthJarRow,
   PendingBudgetMonthEventRow,
@@ -21,6 +20,7 @@ import type {
 } from '../types/month.types';
 import type {
   LifeEventTemplateRow,
+  LifeEventTemplateWithOptionsRow,
   ModuleEventPoolWeightRow,
   LifeEventOptionRow,
 } from '../types/event.types';
@@ -109,17 +109,20 @@ export class BudgetMonthQuery {
   }
 
   /** Month by id with jars. */
-  async findMonthWithJars(monthId: bigint): Promise<MonthWithJars | null> {
-    return this.prisma.budgetRunMonth.findUnique({
+  async findMonthWithJars(
+    monthId: bigint,
+    tx?: TxClient,
+  ): Promise<MonthWithJars | null> {
+    return this.client(tx).budgetRunMonth.findUnique({
       where: { id: monthId },
       include: { jars: true, billResolution: true, indexResolution: true },
     });
   }
 
-  /** Month by id with run, jobState (for index resolution), and jars (for applyEventChoice: auth + payment + index in one read). */
+  /** Month by id with run, jobState, module, and jars (applyEventChoice: auth + payment + index + preview in one read). */
   async findMonthWithRunAndJars(
     monthId: bigint,
-  ): Promise<MonthWithRunAndJars | null> {
+  ): Promise<MonthWithRunAndJobLevelAndJars | null> {
     return this.prisma.budgetRunMonth.findUnique({
       where: { id: monthId },
       include: {
@@ -130,6 +133,7 @@ export class BudgetMonthQuery {
                 job: { include: { levels: true } },
               },
             },
+            module: true,
           },
         },
         billResolution: true,
@@ -410,6 +414,20 @@ export class BudgetMonthQuery {
     });
   }
 
+  /** Count all OT events spawned for this month (pending + resolved, for monthly cap). */
+  async countOvertimeEventsForMonth(
+    monthId: bigint,
+    tx?: TxClient,
+  ): Promise<number> {
+    return this.client(tx).budgetMonthEvent.count({
+      where: {
+        budgetMonthId: monthId,
+        eventSource: EVENT_SOURCE_WORK,
+        eventSubtype: EVENT_SUBTYPE_OVERTIME,
+      },
+    });
+  }
+
   /** True if this week already has an OT event. */
   async hasOvertimeEventForWeek(
     monthId: bigint,
@@ -431,22 +449,22 @@ export class BudgetMonthQuery {
     monthId: bigint,
     tx?: TxClient,
   ): Promise<ChosenEventsTotalsResult> {
-    const events = await this.client(tx).budgetMonthEvent.findMany({
-      where: {
-        budgetMonthId: monthId,
-        chosenOptionId: { not: null },
-      },
-      include: { option: true },
-    });
-    let healthDeltaTotal = 0;
-    let lqiDeltaTotal = 0;
-    for (const e of events) {
-      if (e.option) {
-        healthDeltaTotal += Number(e.option.healthDelta ?? 0);
-        lqiDeltaTotal += Number(e.option.lqiDelta ?? 0);
-      }
-    }
-    return { healthDeltaTotal, lqiDeltaTotal };
+    const client = this.client(tx);
+    const result = await (client as any).$queryRaw<
+      Array<{ health_total: number; lqi_total: number }>
+    >`
+      SELECT COALESCE(SUM(o.health_delta), 0)::int AS health_total,
+             COALESCE(SUM(o.lqi_delta), 0)::int    AS lqi_total
+      FROM budget_month_events e
+      JOIN life_event_options o ON e.chosen_option_id = o.id
+      WHERE e.budget_month_id = ${monthId}
+        AND e.chosen_option_id IS NOT NULL
+    `;
+    const row = result[0];
+    return {
+      healthDeltaTotal: Number(row?.health_total ?? 0),
+      lqiDeltaTotal: Number(row?.lqi_total ?? 0),
+    };
   }
 
   /** Event template ids used in a run in a month range. */
@@ -492,11 +510,11 @@ export class BudgetMonthQuery {
     return events.map((e) => e.eventTemplateId);
   }
 
-  /** Life-lane templates only (excludes work/OT). */
+  /** Life-lane templates only (excludes work/OT). Includes options for affordability check. */
   async findLifeEventTemplatesForModule(
     moduleId: number,
     excludeTemplateIds: bigint[],
-  ): Promise<LifeEventTemplateRow[]> {
+  ): Promise<LifeEventTemplateWithOptionsRow[]> {
     return this.prisma.lifeEventTemplate.findMany({
       where: {
         moduleId,
@@ -505,15 +523,16 @@ export class BudgetMonthQuery {
           ? { notIn: excludeTemplateIds }
           : undefined,
       },
+      include: { options: true },
     });
   }
 
-  /** Life-lane templates by LQI category (positive, neutral, compromise, undesirable). */
+  /** Life-lane templates by LQI category (positive, neutral, compromise, undesirable). Includes options for affordability check. */
   async findLifeEventTemplatesForModuleByCategory(
     moduleId: number,
     category: string,
     excludeTemplateIds: bigint[],
-  ): Promise<LifeEventTemplateRow[]> {
+  ): Promise<LifeEventTemplateWithOptionsRow[]> {
     return this.prisma.lifeEventTemplate.findMany({
       where: {
         moduleId,
@@ -523,6 +542,7 @@ export class BudgetMonthQuery {
           ? { notIn: excludeTemplateIds }
           : undefined,
       },
+      include: { options: true },
     });
   }
 
@@ -550,25 +570,22 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<ChosenEventsTotalsResult> {
-    const rows = await this.client(tx).budgetMonthEvent.findMany({
-      where: {
-        budgetMonthId: monthId,
-        week,
-        chosenOptionId: { not: null },
-      },
-      include: {
-        option: true,
-      },
-    });
-
-    let healthDeltaTotal = 0;
-    let lqiDeltaTotal = 0;
-
-    for (const row of rows) {
-      healthDeltaTotal += Number(row.option?.healthDelta ?? 0);
-      lqiDeltaTotal += Number(row.option?.lqiDelta ?? 0);
-    }
-
-    return { healthDeltaTotal, lqiDeltaTotal };
+    const client = this.client(tx);
+    const result = await (client as any).$queryRaw<
+      Array<{ health_total: number; lqi_total: number }>
+    >`
+      SELECT COALESCE(SUM(o.health_delta), 0)::int AS health_total,
+             COALESCE(SUM(o.lqi_delta), 0)::int    AS lqi_total
+      FROM budget_month_events e
+      JOIN life_event_options o ON e.chosen_option_id = o.id
+      WHERE e.budget_month_id = ${monthId}
+        AND e.week = ${week}
+        AND e.chosen_option_id IS NOT NULL
+    `;
+    const row = result[0];
+    return {
+      healthDeltaTotal: Number(row?.health_total ?? 0),
+      lqiDeltaTotal: Number(row?.lqi_total ?? 0),
+    };
   }
 }

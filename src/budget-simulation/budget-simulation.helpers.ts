@@ -105,20 +105,57 @@ export function genAutoSpendLabel(
     return `${prefix} ${verb} — ${style} ${tail}`;
 }
 
+/** Seasonal bill increase rules by month index. */
+const SEASONAL_BILL_OVERRIDES: Record<
+  number,
+  { minPct: number; maxPct: number; reason: string }
+> = {
+  1: {
+    minPct: 0.05,
+    maxPct: 0.12,
+    reason: 'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
+  },
+  2: {
+    minPct: 0.05,
+    maxPct: 0.12,
+    reason: 'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
+  },
+  5: {
+    minPct: 0.06,
+    maxPct: 0.15,
+    reason: 'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
+  },
+  6: {
+    minPct: 0.06,
+    maxPct: 0.15,
+    reason: 'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
+  },
+};
+
 /**
- * Computes final bills amount from estimated using deterministic variance (+/- 5%).
- * Returns actual amount and delta from estimated.
+ * Computes final bills amount from estimated using deterministic variance.
+ * Normal months: ±5%. Seasonal months (1-2 winter, 5-6 summer): always positive, stronger delta.
+ * Returns actual amount, delta, and optional reason for the increase.
  */
 export function computeBillsFinal(
     runId: number,
     monthIndex: number,
     estimated: number
-): { estimated: number; actual: number; delta: number } {
+): { estimated: number; actual: number; delta: number; reason: string | null } {
     const seed = `${runId}:${monthIndex}:bills`;
     const r = deterministicRandom(seed);
+
+    const seasonal = SEASONAL_BILL_OVERRIDES[monthIndex];
+    if (seasonal) {
+      const factor = seasonal.minPct + r * (seasonal.maxPct - seasonal.minPct);
+      const actual = Math.round(estimated * (1 + factor));
+      const delta = actual - estimated;
+      return { estimated, actual, delta, reason: seasonal.reason };
+    }
+
     const factor = (r - 0.5) * 0.1;
     const actual = Math.round(estimated * (1 + factor));
     const delta = actual - estimated;
-    return { estimated, actual, delta };
+    return { estimated, actual, delta, reason: null };
 }
 

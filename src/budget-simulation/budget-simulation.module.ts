@@ -4,6 +4,7 @@ import { BudgetSimulationService } from './budget-simulation.service';
 import { BudgetSimulationConfigService } from './services/config.service';
 import { BudgetSimulationSetupService } from './services/setup.service';
 import { BudgetSimulationRunCommitmentService } from './services/run/run-commitment.service';
+import { BudgetSimulationRunStateService } from './services/run/run-state.service';
 import { BudgetSimulationRunService } from './services/run/run.service';
 import { BudgetSimulationMonthService } from './services/month/month.service';
 import { MonthWeekService } from './services/month/month-week.service';
@@ -34,6 +35,7 @@ import { TransactionRunner } from '@app/prisma/transaction.runner';
     BudgetMonthRepository,
     BudgetSimulationSetupService,
     BudgetSimulationRunService,
+    BudgetSimulationRunStateService,
     BudgetSimulationRunCommitmentService,
     MonthSpendService,
     MonthIndexService,

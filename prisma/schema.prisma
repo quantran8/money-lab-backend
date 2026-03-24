@@ -213,6 +213,7 @@ model UserRunCommitment {
   @@unique([budgetRunId, commitmentTemplateId])
   @@index([budgetRunId], map: "idx_user_run_commitments_run")
   @@index([commitmentTemplateId], map: "idx_user_run_commitments_template")
+  @@index([budgetRunId, effectiveFromMonthIndex, effectiveToMonthIndex], map: "idx_user_run_commitments_effective_range")
   @@map("user_run_commitments")
   @@schema("public")
 }
@@ -399,6 +400,7 @@ model BudgetMonthEvent {
   @@unique([budgetMonthId, week, eventSource], map: "uq_budget_month_events_month_week_source")
   @@index([chosenOptionId], map: "idx_budget_month_events_option")
   @@index([eventTemplateId], map: "idx_budget_month_events_template")
+  @@index([budgetMonthId, week, chosenOptionId], map: "idx_budget_month_events_month_week_chosen")
   @@map("budget_month_events")
   @@schema("public")
 }

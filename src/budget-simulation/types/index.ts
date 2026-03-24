@@ -17,6 +17,7 @@ export type {
 } from './month.types';
 export type {
   LifeEventTemplateRow,
+  LifeEventTemplateWithOptionsRow,
   ModuleEventPoolWeightRow,
   LifeEventOptionRow,
   SpawnEventOptionPayload,

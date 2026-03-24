@@ -40,7 +40,8 @@ export class MonthBillService {
     context: ReconcileBillsContext,
     tx: TxClient,
     effectiveCurrentWeek?: number,
-  ): Promise<Record<string, number>> {
+    reason?: string | null,
+  ): Promise<Record<string, number | string | null>> {
     const monthIdBig = BigInt(monthId);
     const { jars, month } = context;
     if (month.budgetRun.userId !== userId)
@@ -65,6 +66,7 @@ export class MonthBillService {
       freeCash: Number(month.freeCash ?? 0),
       jars: jarStates,
       actual,
+      reason: reason ?? null,
     });
 
     if (result.delta <= 0) {
@@ -87,7 +89,7 @@ export class MonthBillService {
       return result.breakdown;
     }
 
-    const reserveTaken = result.breakdown['billReserve'] ?? 0;
+    const reserveTaken = Number(result.breakdown['billReserve'] ?? 0);
     await this.monthRepository.updateBillResolution(
       monthIdBig,
       { billReserveEnd: billReserveEnd - reserveTaken },
@@ -112,7 +114,7 @@ export class MonthBillService {
       {
         billReconcileBreakdown: result.breakdown,
         shortfallTotal: result.structuralOvercommitment
-          ? (result.breakdown['uncovered'] ?? 0)
+          ? Number(result.breakdown['uncovered'] ?? 0)
           : 0,
       },
       tx,
@@ -125,7 +127,7 @@ export class MonthBillService {
     monthId: number,
     actual: number,
     tx?: TxClient,
-  ): Promise<Record<string, number>> {
+  ): Promise<Record<string, number | string | null>> {
     const monthIdBig = BigInt(monthId);
     const month = await this.monthQuery.findMonthWithRun(monthIdBig, tx);
     if (!month || month.budgetRun.userId !== userId)

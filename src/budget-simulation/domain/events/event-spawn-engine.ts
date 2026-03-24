@@ -60,6 +60,42 @@ export function chooseTemplate(
   return templates[templates.length - 1].id;
 }
 
+export interface EventOptionCost {
+  moneyDelta: number;
+}
+
+export interface TemplateWithOptions {
+  id: bigint;
+  rarity: number;
+  options: EventOptionCost[];
+}
+
+/**
+ * Returns the cheapest cost among all options of a template.
+ * Cost = abs(moneyDelta) for negative deltas; 0 for non-negative.
+ */
+function cheapestOptionCost(options: EventOptionCost[]): number {
+  if (options.length === 0) return 0;
+  return Math.min(
+    ...options.map((o) => (o.moneyDelta < 0 ? Math.abs(o.moneyDelta) : 0)),
+  );
+}
+
+/**
+ * Filters templates so the cheapest option cost <= totalAvailableFunds.
+ * If none are affordable, falls back to templates that have a zero-cost option.
+ */
+export function filterAffordableTemplates<
+  T extends TemplateWithOptions,
+>(templates: T[], totalAvailableFunds: number): T[] {
+  const affordable = templates.filter(
+    (t) => cheapestOptionCost(t.options) <= totalAvailableFunds,
+  );
+  if (affordable.length > 0) return affordable;
+
+  return templates.filter((t) => cheapestOptionCost(t.options) === 0);
+}
+
 /**
  * Full spawn flow: should spawn (roll), then pick template from list.
  * Use when templates are already loaded (e.g. no category weights).

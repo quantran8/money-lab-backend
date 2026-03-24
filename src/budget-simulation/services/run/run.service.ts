@@ -10,7 +10,6 @@ import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
 import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
 import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
-import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import {
   CommitmentLayer,
   JarCode,
@@ -18,7 +17,6 @@ import {
 import {
   BILL_RESERVE_OPTIONS,
   FREE_CASH_CODE,
-  WEEK_INDEX_COMPLETE_MONTH,
 } from '@budget-simulation/budget-simulation.constant';
 import { resolveLqiState } from '@budget-simulation/budget-simulation.helpers';
 import { BudgetSimulationConfigService } from '../config.service';
@@ -26,9 +24,8 @@ import type {
   OptionalCommitmentUpdateInput,
   UpdateRunCommitmentsResult,
 } from '@budget-simulation/types/run-commitment.types';
-import type { NextMonthPreview } from '@budget-simulation/types/month.types';
 import { BudgetSimulationRunCommitmentService } from './run-commitment.service';
-import { NextMonthPreviewService } from '../month/next-month-preview.service';
+import { BudgetSimulationRunStateService } from './run-state.service';
 import {
   calculateMonthIncome,
   resolveBaseJobIncome,
@@ -48,10 +45,9 @@ export class BudgetSimulationRunService {
     private readonly runRepository: BudgetRunRepository,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
-    private readonly commitmentQuery: CommitmentQuery,
     private readonly configService: BudgetSimulationConfigService,
     private readonly runCommitments: BudgetSimulationRunCommitmentService,
-    private readonly previewService: NextMonthPreviewService,
+    private readonly runState: BudgetSimulationRunStateService,
   ) {}
 
   async updateRunCommitments(
@@ -105,119 +101,7 @@ export class BudgetSimulationRunService {
   }
 
   async getActiveBudgetRun(userId: string) {
-    return wrapAsync(this.logger, 'getActiveBudgetRun', async () => {
-      const run = await this.runQuery.findActiveRunWithDetails(userId);
-      if (!run) return null;
-
-      const activeMonthIndex = run.months[0]?.monthIndex ?? 1;
-      const activeCommitments =
-        await this.runQuery.findActiveCommitmentsForMonth(
-          run.id,
-          activeMonthIndex,
-        );
-
-      const housingId = activeCommitments.find(
-        (c) => c.template.category === 'housing',
-      )?.template.id;
-      const [billTemplates, housingUtilityModifiers] = await Promise.all([
-        this.commitmentQuery.findBillTemplates(run.moduleId),
-        housingId
-          ? this.commitmentQuery.findHousingModifiersByCommitmentIds([
-              housingId,
-            ])
-          : Promise.resolve([]),
-      ]);
-
-      const billEstimatedTemplates = billTemplates.map((t) => {
-        const modifiers = housingUtilityModifiers.find(
-          (m) => m.utilityName === t.name,
-        );
-        const modifierAmount =
-          Number(modifiers?.multiplier ?? 1) * t.baseMonthlyAmount;
-        return {
-          templateId: t.id.toString(),
-          name: t.name,
-          layer: t.layer,
-          amount: modifierAmount,
-        };
-      });
-
-      const latestMonth = run.months[0];
-      const jarsArr =
-        latestMonth?.jars.filter((j) => j.jarCode !== FREE_CASH_CODE) ?? [];
-
-      const freeCashAlloc = latestMonth?.freeCash ?? 0;
-      const freeCashJar = latestMonth?.jars.find(
-        (j) => j.jarCode === FREE_CASH_CODE,
-      );
-      const freeCashBalance = freeCashJar
-        ? Number(freeCashJar.allocatedAmount) -
-          Number(freeCashJar.spentAmount) +
-          Number(freeCashJar.overflowInAmount) -
-          Number(freeCashJar.overflowOutAmount)
-        : freeCashAlloc;
-
-      const necessitiesTotal =
-        (latestMonth?.lockedCommitmentsTotal ?? 0) +
-        (latestMonth?.billsEstimated ?? 0) +
-        (latestMonth?.billResolution?.billReserveTarget ?? 0);
-
-      const isMonthResolved = latestMonth
-        ? latestMonth.billsActual !== null
-        : false;
-
-      let nextMonthPreview: NextMonthPreview | undefined;
-      if (isMonthResolved && latestMonth) {
-        const fullMonth =
-          await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
-            latestMonth.id,
-          );
-        if (fullMonth) {
-          nextMonthPreview =
-            await this.previewService.computePreview(fullMonth);
-        }
-      }
-
-      const result = {
-        id: run.id.toString(),
-        moduleId: run.moduleId,
-        userId: run.userId,
-        jobId: run.jobState.jobId.toString(),
-        currentMonthIndex: latestMonth?.monthIndex ?? 1,
-        isMonthResolved,
-        freeCash: freeCashBalance,
-        income: latestMonth?.income ?? 0,
-        necessitiesTotal,
-        spendMode: latestMonth?.spendModeCode,
-        billReserveOption: latestMonth?.billReserveOptionCode,
-        commitments: [
-          ...activeCommitments.map((c) => ({
-            templateId: c.commitmentTemplateId.toString(),
-            name: c.template.name,
-            layer: c.template.layer,
-            amount: c.selectedAmount,
-          })),
-          ...billEstimatedTemplates,
-        ],
-        jars: jarsArr.reduce(
-          (acc, curr) => {
-            const balance =
-              Number(curr.allocatedAmount) -
-              Number(curr.spentAmount) +
-              Number(curr.overflowInAmount) -
-              Number(curr.overflowOutAmount);
-            acc[curr.jarCode] = {
-              allocation: Number(curr.allocatedAmount),
-              balance,
-            };
-            return acc;
-          },
-          {} as Record<string, { allocation: number; balance: number }>,
-        ),
-        nextMonthPreview,
-      };
-      return result;
-    });
+    return this.runState.getActiveBudgetRun(userId);
   }
 
   async startBudgetRun(
@@ -394,10 +278,9 @@ export class BudgetSimulationRunService {
         .filter((c) => c.template.category === 'housing')
         .map((c) => c.commitmentTemplateId);
 
-      const [housingUtilityModifiers, billTemplates] = await Promise.all([
-        this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds),
-        this.commitmentQuery.findBillTemplatesByLayer(3, CommitmentLayer.bills),
-      ]);
+      const housingUtilityModifiers =
+        this.configService.getHousingModifiersByCommitmentIds(housingIds);
+      const billTemplates = this.configService.getBillTemplates();
 
       const billsEstimated = billTemplates.reduce((sum, t) => {
         const modifier = housingUtilityModifiers.find(
@@ -522,30 +405,6 @@ export class BudgetSimulationRunService {
   }
 
   async prepareNextMonth(userId: string, runId: number) {
-    return wrapAsync(this.logger, 'prepareNextMonth', async () => {
-      const runIdBig = BigInt(runId);
-      const run =
-        await this.runQuery.findRunWithLatestMonthAndCommitments(runIdBig);
-
-      if (!run || run.userId !== userId)
-        throw new NotFoundException('Run not found or unauthorized');
-
-      const latestMonth = run.months[0];
-      if (
-        !latestMonth ||
-        latestMonth.billsActual === null ||
-        latestMonth.currentWeek < WEEK_INDEX_COMPLETE_MONTH
-      ) {
-        throw new BadRequestException('Current month not fully resolved');
-      }
-
-      const fullMonth =
-        await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
-          latestMonth.id,
-        );
-      if (!fullMonth) throw new NotFoundException('Month not found');
-
-      return this.previewService.computePreview(fullMonth);
-    });
+    return this.runState.prepareNextMonth(userId, runId);
   }
 }

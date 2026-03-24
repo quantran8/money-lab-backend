@@ -17,10 +17,11 @@ export interface BillsInput {
   freeCash: number;
   jars: BillReconcileJarState[];
   actual: number;
+  reason: string | null;
 }
 
 export interface BillsResult {
-  breakdown: Record<string, number>;
+  breakdown: Record<string, number | string | null>;
   jarChanges: { jarCode: string; amount: number }[];
   /** Surplus to add to free cash (when delta <= 0). */
   freeCashChange: number;
@@ -31,6 +32,8 @@ export interface BillsResult {
   actual: number;
   /** Delta (actual - estimated). */
   delta: number;
+  /** Seasonal reason for bill increase (null for normal months or delta <= 0). */
+  reason: string | null;
 }
 
 const JAR_ORDER = ['fun', 'give', 'learning', 'free_cash', 'future_you'];
@@ -42,7 +45,7 @@ export function computeBills(
   runId: number,
   monthIndex: number,
   estimated: number,
-): { estimated: number; actual: number; delta: number } {
+): { estimated: number; actual: number; delta: number; reason: string | null } {
   return computeBillsFinal(runId, monthIndex, estimated);
 }
 
@@ -57,10 +60,11 @@ export function reconcile(input: BillsInput): BillsResult {
     freeCash,
     jars,
     actual,
+    reason,
   } = input;
 
   const delta = actual - billsEstimated;
-  const breakdown: Record<string, number> = {};
+  const breakdown: Record<string, number | string | null> = {};
   const jarChanges: { jarCode: string; amount: number }[] = [];
 
   if (delta <= 0) {
@@ -75,7 +79,12 @@ export function reconcile(input: BillsInput): BillsResult {
       structuralOvercommitment: false,
       actual,
       delta,
+      reason: null,
     };
+  }
+
+  if (reason) {
+    breakdown['reason'] = reason;
   }
 
   let rem = delta;
@@ -122,5 +131,6 @@ export function reconcile(input: BillsInput): BillsResult {
     structuralOvercommitment: rem > 0,
     actual,
     delta,
+    reason,
   };
 }

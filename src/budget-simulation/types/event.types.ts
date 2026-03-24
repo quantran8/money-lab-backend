@@ -5,6 +5,10 @@ export type LifeEventTemplateRow = Prisma.LifeEventTemplateGetPayload<
   Record<string, never>
 >;
 
+/** Life event template with options included (for affordability check during spawn). */
+export type LifeEventTemplateWithOptionsRow =
+  Prisma.LifeEventTemplateGetPayload<{ include: { options: true } }>;
+
 export type ModuleEventPoolWeightRow =
   Prisma.ModuleEventPoolWeightGetPayload<Record<string, never>>;
 

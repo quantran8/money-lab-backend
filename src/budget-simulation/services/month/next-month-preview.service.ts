@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
-import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import {
   BillReserveOptionCode,
   CommitmentLayer,
@@ -8,6 +7,7 @@ import {
 } from '@budget-simulation/budget-simulation.enum';
 import { getBillReserveCoveragePct } from '@budget-simulation/budget-simulation.constant';
 import { resolveBaseJobIncome } from '@budget-simulation/domain';
+import { BudgetSimulationConfigService } from '../config.service';
 import type { MonthWithRunAndJobLevelAndJars } from '@budget-simulation/types/month.types';
 import type { NextMonthPreview } from '@budget-simulation/types/month.types';
 
@@ -15,7 +15,7 @@ import type { NextMonthPreview } from '@budget-simulation/types/month.types';
 export class NextMonthPreviewService {
   constructor(
     private readonly runQuery: BudgetRunQuery,
-    private readonly commitmentQuery: CommitmentQuery,
+    private readonly configService: BudgetSimulationConfigService,
   ) {}
 
   async computePreview(
@@ -57,15 +57,10 @@ export class NextMonthPreviewService {
     );
     const housingIds = billingCommitments.map((c) => c.commitmentTemplateId);
 
-    const [housingUtilityModifiers, billTemplates] = await Promise.all([
-      housingIds.length > 0
-        ? this.commitmentQuery.findHousingModifiersByCommitmentIds(housingIds)
-        : Promise.resolve([]),
-      this.commitmentQuery.findBillTemplatesByLayer(
-        month.budgetRun.moduleId,
-        CommitmentLayer.bills,
-      ),
-    ]);
+    // Use cached bill templates and housing modifiers (no DB hit)
+    const billTemplates = this.configService.getBillTemplates();
+    const housingUtilityModifiers =
+      this.configService.getHousingModifiersByCommitmentIds(housingIds);
 
     const estimatedBills = billTemplates.reduce((sum, t) => {
       const modifier = housingUtilityModifiers.find(

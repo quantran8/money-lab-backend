@@ -79,25 +79,19 @@ export class MonthWeekService {
 
     const nextWeek = month.currentWeek + 1;
 
-    const unresolvedChoiceCountOnCurrentWeek =
-      month.currentWeek >= 1
-        ? await this.monthQuery.countPendingEventsForWeek(
-            monthId,
-            month.currentWeek,
-          )
-        : 0;
-
-    const spendModeRatePromise = this.spendService.getSpendModeRate(
-      month.spendModeCode ?? SpendModeCode.normal,
-    );
-
     const [
+      unresolvedChoiceCountOnCurrentWeek,
       spendModeRate,
       lifeEventPendingForNextWeek,
       overtimeEventPendingForNextWeek,
       totalEventCount,
     ] = await Promise.all([
-      spendModeRatePromise,
+      month.currentWeek >= 1
+        ? this.monthQuery.countPendingEventsForWeek(monthId, month.currentWeek)
+        : Promise.resolve(0),
+      this.spendService.getSpendModeRate(
+        month.spendModeCode ?? SpendModeCode.normal,
+      ),
       this.monthQuery.findPendingLifeEventWithTemplate(monthId, nextWeek),
       this.monthQuery.findPendingOvertimeEventWithTemplate(monthId, nextWeek),
       this.monthQuery.countEventsForWeek(monthId, nextWeek),
@@ -160,6 +154,11 @@ export class MonthWeekService {
 
       if (month.budgetRun.userId !== userId)
         throw new BadRequestException('Month not found');
+      if (
+        month.monthIndex >= RUN_MONTH_INDEX_COMPLETE &&
+        month.currentWeek > WEEK_INDEX_COMPLETE_MONTH
+      )
+        throw new BadRequestException('Run already complete');
       if (month.currentWeek >= WEEK_INDEX_COMPLETE_MONTH)
         throw new BadRequestException('Month already complete');
       if (unresolvedChoiceCountOnCurrentWeek > 0)
@@ -219,141 +218,150 @@ export class MonthWeekService {
       const buildPayload = (row: PendingEventWithTemplateRow) =>
         this.eventService.buildSpawnPayload(month, row);
 
-      const [entries, pendingEvents, billsFromTx, forcedRestNotice] =
-        await this.transactionRunner.run(async (tx: TxClient) => {
-          await this.monthRepository.updateMonth(
+      const [
+        entries,
+        pendingEvents,
+        billsFromTx,
+        forcedRestNotice,
+        updatedMonthFromTx,
+      ] = await this.transactionRunner.run(async (tx: TxClient) => {
+        await this.monthRepository.updateMonth(
+          monthIdBig,
+          { currentWeek: nextWeek },
+          tx,
+        );
+
+        if (didForcedRest) {
+          await this.monthRepository.updateIndexResolution(
             monthIdBig,
-            { currentWeek: nextWeek },
+            {
+              forcedRestWeek: nextWeek,
+              incomeLossFromForcedRest,
+              hiRecoveryFromForcedRest: hiRecoveryFromForcedRest,
+            },
             tx,
           );
+        }
 
-          if (didForcedRest) {
-            await this.monthRepository.updateIndexResolution(
+        for (const op of spendResult.spendOps) {
+          await this.spendService.addSpendLog(
+            monthIdBig,
+            op.jarCode,
+            op.amount,
+            0,
+            0,
+            tx,
+          );
+        }
+
+        const payloads: SpawnEventTemplatePayload[] = [];
+
+        if (!didForcedRest) {
+          if (lifeEventPendingForNextWeek) {
+            payloads.push(buildPayload(lifeEventPendingForNextWeek));
+          } else if (lifeEventTemplateIdToCreate != null) {
+            const created = await this.monthRepository.createEventWithTemplate(
               monthIdBig,
-              {
-                forcedRestWeek: nextWeek,
-                incomeLossFromForcedRest,
-                hiRecoveryFromForcedRest: hiRecoveryFromForcedRest,
-              },
-              tx,
-            );
-          }
-
-          for (const op of spendResult.spendOps) {
-            await this.spendService.addSpendLog(
-              monthIdBig,
-              op.jarCode,
-              op.amount,
-              0,
-              0,
-              tx,
-            );
-          }
-
-          const payloads: SpawnEventTemplatePayload[] = [];
-
-          if (!didForcedRest) {
-            if (lifeEventPendingForNextWeek) {
-              payloads.push(buildPayload(lifeEventPendingForNextWeek));
-            } else if (lifeEventTemplateIdToCreate != null) {
-              const created =
-                await this.monthRepository.createEventWithTemplate(
-                  monthIdBig,
-                  lifeEventTemplateIdToCreate,
-                  nextWeek,
-                  tx,
-                );
-              const row =
-                await this.monthQuery.findPendingEventWithTemplateById(
-                  created.id,
-                  tx,
-                );
-              if (row) payloads.push(buildPayload(row));
-            }
-            if (overtimeEventPendingForNextWeek) {
-              payloads.push(buildPayload(overtimeEventPendingForNextWeek));
-            } else if (overtimeEventTemplateIdToCreate != null) {
-              const created =
-                await this.monthRepository.createEventWithTemplate(
-                  monthIdBig,
-                  overtimeEventTemplateIdToCreate,
-                  nextWeek,
-                  tx,
-                );
-              const row =
-                await this.monthQuery.findPendingEventWithTemplateById(
-                  created.id,
-                  tx,
-                );
-              if (row) payloads.push(buildPayload(row));
-            }
-          }
-
-          const hasPendingEvents = payloads.length > 0;
-
-          if (!hasPendingEvents) {
-            await this.indexService.resolveWeeklyIndex(
-              monthIdBig,
+              lifeEventTemplateIdToCreate,
               nextWeek,
-              spendResult.weeklySpend,
-              forcedRestPayload,
               tx,
-              {
-                month,
-                eventTotals: { healthDeltaTotal: 0, lqiDeltaTotal: 0 },
-              },
             );
+            const row = await this.monthQuery.findPendingEventWithTemplateById(
+              created.id,
+              tx,
+            );
+            if (row) payloads.push(buildPayload(row));
           }
-
-          let billsFromTxInner: { actual: number } | null = null;
-          if (nextWeek === END_OF_MONTH_WEEK && !hasPendingEvents) {
-            const billResult = await this.billService.computeBills(
-              Number(month.budgetRunId),
-              month.monthIndex,
-              month.billsEstimated,
-            );
-            const jarsAfterSpend = month.jars.map((j) => {
-              const op = spendResult.spendOps.find(
-                (o) => o.jarCode === j.jarCode,
-              );
-              const add = op ? op.amount : 0;
-              return {
-                ...j,
-                spentAmount: Number(j.spentAmount) + add,
-              };
-            });
-            await this.billService.reconcileBillsWithContext(
-              userId,
-              Number(monthId),
-              billResult.actual,
-              { month, jars: jarsAfterSpend },
-              tx,
-              nextWeek,
-            );
-            await this.monthRepository.updateMonth(
+          if (overtimeEventPendingForNextWeek) {
+            payloads.push(buildPayload(overtimeEventPendingForNextWeek));
+          } else if (overtimeEventTemplateIdToCreate != null) {
+            const created = await this.monthRepository.createEventWithTemplate(
               monthIdBig,
-              {
-                currentWeek: 5,
-                cumulativeFutureYou: { increment: futureRemainInMonth },
-              },
+              overtimeEventTemplateIdToCreate,
+              nextWeek,
               tx,
             );
-            billsFromTxInner = billResult;
+            const row = await this.monthQuery.findPendingEventWithTemplateById(
+              created.id,
+              tx,
+            );
+            if (row) payloads.push(buildPayload(row));
           }
+        }
 
-          return [
-            spendResult.entries,
-            payloads,
-            billsFromTxInner,
+        const hasPendingEvents = payloads.length > 0;
+
+        if (!hasPendingEvents) {
+          await this.indexService.resolveWeeklyIndex(
+            monthIdBig,
+            nextWeek,
+            spendResult.weeklySpend,
             forcedRestPayload,
-          ] as const;
-        });
+            tx,
+            {
+              month,
+              eventTotals: { healthDeltaTotal: 0, lqiDeltaTotal: 0 },
+            },
+          );
+        }
 
-      const refreshedMonth =
-        await this.monthQuery.findMonthWithJars(monthIdBig);
+        let billsFromTxInner: { actual: number; reason: string | null } | null =
+          null;
+        if (nextWeek === END_OF_MONTH_WEEK && !hasPendingEvents) {
+          const billResult = await this.billService.computeBills(
+            Number(month.budgetRunId),
+            month.monthIndex,
+            month.billsEstimated,
+          );
+          const jarsAfterSpend = month.jars.map((j) => {
+            const op = spendResult.spendOps.find(
+              (o) => o.jarCode === j.jarCode,
+            );
+            const add = op ? op.amount : 0;
+            return {
+              ...j,
+              spentAmount: Number(j.spentAmount) + add,
+            };
+          });
+          await this.billService.reconcileBillsWithContext(
+            userId,
+            Number(monthId),
+            billResult.actual,
+            { month, jars: jarsAfterSpend },
+            tx,
+            nextWeek,
+            billResult.reason,
+          );
+          await this.monthRepository.updateMonth(
+            monthIdBig,
+            {
+              currentWeek: 5,
+              cumulativeFutureYou: { increment: futureRemainInMonth },
+            },
+            tx,
+          );
+          billsFromTxInner = billResult;
+        }
+
+        // Read updated month state inside the transaction to avoid an extra query
+        const updatedMonth = await this.monthQuery.findMonthWithJars(
+          monthIdBig,
+          tx,
+        );
+
+        return [
+          spendResult.entries,
+          payloads,
+          billsFromTxInner,
+          forcedRestPayload,
+          updatedMonth,
+        ] as const;
+      });
+
       const monthComplete =
         nextWeek === END_OF_MONTH_WEEK && pendingEvents.length === 0;
       const bills = monthComplete ? (billsFromTx ?? null) : null;
+      const refreshedMonth = updatedMonthFromTx;
       const futureTotal =
         refreshedMonth?.cumulativeFutureYou ?? month.cumulativeFutureYou;
       const freeCashBalance = refreshedMonth?.freeCash ?? month.freeCash;
@@ -372,18 +380,11 @@ export class MonthWeekService {
           await this.runRepository.completeRun(month.budgetRunId, {
             totalMonths: month.monthIndex,
             finalFutureYouSavings: futureTotal,
-            passed: true,
+            passed: futureTotal > 0,
           });
           runComplete = true;
         } else {
-          const fullMonth =
-            await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
-              monthIdBig,
-            );
-          if (fullMonth) {
-            nextMonthPreview =
-              await this.previewService.computePreview(fullMonth);
-          }
+          nextMonthPreview = await this.previewService.computePreview(month);
         }
       }
 

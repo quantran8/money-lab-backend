@@ -21,6 +21,7 @@ import {
 import {
   chooseCategory,
   chooseTemplate,
+  filterAffordableTemplates,
   jarAvailable,
   resolveOvertimeEffectsFromJobLevel,
   shouldSpawn,
@@ -33,9 +34,8 @@ import { MonthBillService } from './month-bill.service';
 import { NextMonthPreviewService } from './next-month-preview.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
-  MonthWithRunAndJars,
   NextMonthPreview,
-  LifeEventTemplateRow,
+  LifeEventTemplateWithOptionsRow,
   SpawnEventTemplatePayload,
   PendingEventWithTemplateRow,
 } from '@budget-simulation/types';
@@ -162,29 +162,27 @@ export class MonthEventService {
       month.indexResolution?.lqiStateStart ??
       LqiState.stable;
     const fromMonth = Math.max(1, month.monthIndex - 5);
-    const usedIds =
+
+    const [usedIds, weightsRows] = await Promise.all([
       moduleId === BUDGET_SIMULATION_MODULE_ID
-        ? await this.monthQuery.findUsedLifeEventTemplateIds(
+        ? this.monthQuery.findUsedLifeEventTemplateIds(
             month.budgetRunId,
             fromMonth,
             month.monthIndex,
           )
-        : await this.monthQuery.findUsedEventTemplateIds(
+        : this.monthQuery.findUsedEventTemplateIds(
             month.budgetRunId,
             fromMonth,
             month.monthIndex,
-          );
-
-    const weightsRows = await this.monthQuery.findEventPoolWeights(
-      moduleId,
-      lqiState,
-    );
+          ),
+      this.monthQuery.findEventPoolWeights(moduleId, lqiState),
+    ]);
     const weights = weightsRows.map((w) => ({
       eventCategory: w.eventCategory,
       weight: Number(w.weight),
     }));
 
-    let templates: LifeEventTemplateRow[];
+    let templates: LifeEventTemplateWithOptionsRow[];
     if (weights.length > 0) {
       const chosenCategory = chooseCategory(`${seedBase}:category`, weights);
       templates =
@@ -201,7 +199,25 @@ export class MonthEventService {
     }
     if (templates.length === 0) return null;
 
-    const templateRefs = templates.map((t) => ({ id: t.id, rarity: t.rarity }));
+    const totalAvailableFunds =
+      month.jars.reduce(
+        (sum, j) =>
+          sum +
+          jarAvailable(
+            Number(j.allocatedAmount),
+            Number(j.spentAmount),
+            Number(j.overflowInAmount),
+            Number(j.overflowOutAmount),
+          ),
+        0,
+      ) +
+      Number(month.cumulativeFutureYou ?? 0) +
+      Number(month.freeCash ?? 0);
+
+    const affordable = filterAffordableTemplates(templates, totalAvailableFunds);
+    if (affordable.length === 0) return null;
+
+    const templateRefs = affordable.map((t) => ({ id: t.id, rarity: t.rarity }));
     return chooseTemplate(`${seedBase}:template`, templateRefs);
   }
 
@@ -217,20 +233,23 @@ export class MonthEventService {
       return null;
     }
     const config = this.configService.getConfig();
+
+    const [tpl, hasOtThisWeek, eventCount, otSpawnedCount] = await Promise.all([
+      this.monthQuery.findOvertimeEventTemplate(BUDGET_SIMULATION_MODULE_ID),
+      this.monthQuery.hasOvertimeEventForWeek(monthId, week),
+      month.stressModeActive
+        ? this.monthQuery.countEventsForMonth(monthId)
+        : Promise.resolve(0),
+      this.monthQuery.countOvertimeEventsForMonth(monthId),
+    ]);
+
+    if (!tpl) return null;
+    if (hasOtThisWeek) return null;
+
     if (month.stressModeActive) {
       const maxEvents =
         config.indexRules.stressMode?.maxEventCountPerMonth ?? 1;
-      const eventCount = await this.monthQuery.countEventsForMonth(monthId);
       if (eventCount >= maxEvents) return null;
-    }
-
-    const tpl = await this.monthQuery.findOvertimeEventTemplate(
-      BUDGET_SIMULATION_MODULE_ID,
-    );
-    if (!tpl) return null;
-
-    if (await this.monthQuery.hasOvertimeEventForWeek(monthId, week)) {
-      return null;
     }
 
     const jobState = month.budgetRun.jobState;
@@ -240,9 +259,8 @@ export class MonthEventService {
     if (cap != null && cap <= 0) {
       return null;
     }
-    if (cap != null) {
-      const accepted = Number(month.acceptedOvertimeCount ?? 0);
-      if (accepted >= cap) return null;
+    if (cap != null && otSpawnedCount >= cap) {
+      return null;
     }
 
     const minHi = level?.minHiForOvertime;
@@ -265,7 +283,7 @@ export class MonthEventService {
   private async weekChosenEventTotalsForIndex(
     monthIdBig: bigint,
     week: number,
-    month: MonthWithRunAndJars,
+    month: MonthWithRunAndJobLevelAndJars,
     tx: TxClient,
   ): Promise<ChosenEventsTotalsResult> {
     const rows = await this.monthQuery.findChosenEventsForWeekWithTemplates(
@@ -313,15 +331,11 @@ export class MonthEventService {
     week: number,
     tx?: TxClient,
   ): Promise<SpawnEventTemplatePayload | null> {
-    const [month, existingLife, existingOt] = await Promise.all([
-      this.monthQuery.findMonthWithRunAndModule(monthId, tx),
+    const [fullMonth, existingLife, existingOt] = await Promise.all([
+      this.monthQuery.findMonthWithRunAndJobLevelAndJars(monthId),
       this.monthQuery.findPendingLifeEventWithTemplate(monthId, week, tx),
       this.monthQuery.findPendingOvertimeEventWithTemplate(monthId, week, tx),
     ]);
-    if (!month) return null;
-
-    const fullMonth =
-      await this.monthQuery.findMonthWithRunAndJobLevelAndJars(monthId);
     if (!fullMonth) return null;
 
     const pending =
@@ -333,7 +347,7 @@ export class MonthEventService {
     }
 
     const config = this.configService.getConfig();
-    if (month.stressModeActive) {
+    if (fullMonth.stressModeActive) {
       const maxEvents =
         config.indexRules.stressMode?.maxEventCountPerMonth ?? 1;
       const eventCount = await this.monthQuery.countEventsForMonth(monthId, tx);
@@ -398,14 +412,10 @@ export class MonthEventService {
         throw new BadRequestException('Invalid or resolved event');
       }
     } else {
-      const life = await this.monthQuery.findPendingLifeEventWithTemplate(
-        monthIdBig,
-        week,
-      );
-      const ot = await this.monthQuery.findPendingOvertimeEventWithTemplate(
-        monthIdBig,
-        week,
-      );
+      const [life, ot] = await Promise.all([
+        this.monthQuery.findPendingLifeEventWithTemplate(monthIdBig, week),
+        this.monthQuery.findPendingOvertimeEventWithTemplate(monthIdBig, week),
+      ]);
       event = life ?? ot;
       if (!event && month.budgetRun.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
         event = await this.monthQuery.findPendingEventWithTemplate(
@@ -463,6 +473,7 @@ export class MonthEventService {
     const paymentRecord: { jar: string; amount: number }[] = [];
     const learningXpDelta = option.learningXpDelta ?? 0;
     const jars = month.jars;
+    let cumulativeFutureYouDeducted = 0;
 
     if (cost > 0) {
       const primaryAvailable = this.spendService.jarAvailableFromLoaded(
@@ -476,6 +487,24 @@ export class MonthEventService {
         const firstDeduct = primaryAvailable;
         let remaining = cost - firstDeduct;
         paymentRecord.push({ jar: paymentJarCode, amount: firstDeduct });
+
+        if (
+          paymentJarCode === JarCode.futureYou &&
+          remaining > 0 &&
+          Number(month.cumulativeFutureYou ?? 0) > 0
+        ) {
+          const cumulativeAvailable = Number(month.cumulativeFutureYou ?? 0);
+          const fromCumulative = Math.min(cumulativeAvailable, remaining);
+          if (fromCumulative > 0) {
+            cumulativeFutureYouDeducted = fromCumulative;
+            paymentRecord.push({
+              jar: 'cumulative_future_you',
+              amount: fromCumulative,
+            });
+            remaining -= fromCumulative;
+          }
+        }
+
         for (const coverJar of coverJarCodes) {
           if (remaining <= 0) break;
           const coverAvailable = this.spendService.jarAvailableFromLoaded(
@@ -539,41 +568,56 @@ export class MonthEventService {
     }
 
     const txResult = await this.transactionRunner.run(async (tx: TxClient) => {
+      // Phase 1: Run all independent writes in parallel
+      const writeOps: Promise<unknown>[] = [];
+
       if (cost > 0) {
+        let freeCashDecrement = 0;
         for (const { jar, amount } of paymentRecord) {
-          if (jar === FREE_CASH_CODE) {
-            await this.monthRepository.updateMonth(
-              monthIdBig,
-              { freeCash: { decrement: amount } },
-              tx,
-            );
+          if (jar === 'cumulative_future_you') {
+            // Handled separately below
+          } else if (jar === FREE_CASH_CODE) {
+            freeCashDecrement += amount;
           } else {
-            await this.spendService.addSpendLog(
-              monthIdBig,
-              jar,
-              amount,
-              0,
-              0,
-              tx,
+            writeOps.push(
+              this.spendService.addSpendLog(monthIdBig, jar, amount, 0, 0, tx),
             );
           }
+        }
+        const monthDecrements: Record<string, unknown> = {};
+        if (freeCashDecrement > 0) {
+          monthDecrements.freeCash = { decrement: freeCashDecrement };
+        }
+        if (cumulativeFutureYouDeducted > 0) {
+          monthDecrements.cumulativeFutureYou = {
+            decrement: cumulativeFutureYouDeducted,
+          };
+        }
+        if (Object.keys(monthDecrements).length > 0) {
+          writeOps.push(
+            this.monthRepository.updateMonth(monthIdBig, monthDecrements, tx),
+          );
         }
       } else if (moneyDelta > 0) {
         const jar = option.moneyJarCode ?? FREE_CASH_CODE;
         if (jar === FREE_CASH_CODE) {
-          await this.monthRepository.updateMonth(
-            monthIdBig,
-            { freeCash: { increment: moneyDelta } },
-            tx,
+          writeOps.push(
+            this.monthRepository.updateMonth(
+              monthIdBig,
+              { freeCash: { increment: moneyDelta } },
+              tx,
+            ),
           );
         } else {
-          await this.spendService.addSpendLog(
-            monthIdBig,
-            jar,
-            0,
-            moneyDelta,
-            0,
-            tx,
+          writeOps.push(
+            this.spendService.addSpendLog(
+              monthIdBig,
+              jar,
+              0,
+              moneyDelta,
+              0,
+              tx,
+            ),
           );
         }
       }
@@ -582,28 +626,36 @@ export class MonthEventService {
         paymentRecord.length > 0
           ? paymentRecord.map(({ jar, amount }) => ({ jarCode: jar, amount }))
           : {};
-      await this.monthRepository.updateEventChosen(
-        event.id,
-        optionIdBig,
-        paymentBreakdown,
-        tx,
+      writeOps.push(
+        this.monthRepository.updateEventChosen(
+          event.id,
+          optionIdBig,
+          paymentBreakdown,
+          tx,
+        ),
       );
 
       if (isOtAccept) {
-        await this.monthRepository.incrementOvertimeAcceptOnMonth(
-          monthIdBig,
-          overtimeIncomeAccruedToNextMonth,
-          tx,
+        writeOps.push(
+          this.monthRepository.incrementOvertimeAcceptOnMonth(
+            monthIdBig,
+            overtimeIncomeAccruedToNextMonth,
+            tx,
+          ),
         );
       }
 
       if (learningXpDelta !== 0 && month.budgetRun.jobStateId != null) {
-        await this.runRepository.incrementUserJobStateXpBounded(
-          month.budgetRun.jobStateId,
-          learningXpDelta,
-          tx,
+        writeOps.push(
+          this.runRepository.incrementUserJobStateXpBounded(
+            month.budgetRun.jobStateId,
+            learningXpDelta,
+            tx,
+          ),
         );
       }
+
+      await Promise.all(writeOps);
 
       const stillPending = await this.monthQuery.countPendingEventsForWeek(
         monthIdBig,
@@ -617,7 +669,7 @@ export class MonthEventService {
           indexResult: undefined as
             | Awaited<ReturnType<MonthIndexService['resolveWeeklyIndex']>>
             | undefined,
-          bills: null as { actual: number } | null,
+          bills: null as { actual: number; reason: string | null } | null,
           monthComplete: false,
           futureYouTotal: 0,
           spendingSummary: {} as Record<string, number>,
@@ -640,7 +692,7 @@ export class MonthEventService {
         { month, eventTotals: aggregatedTotals },
       );
 
-      let bills: { actual: number } | null = null;
+      let bills: { actual: number, reason: string | null } | null = null;
       let monthComplete = false;
       let futureYouTotal = 0;
       const spendingSummary: Record<string, number> = {};
@@ -657,6 +709,8 @@ export class MonthEventService {
           billResult.actual,
           { month: monthAfterPayment, jars: jarsAfterPayment },
           tx,
+          undefined,
+          billResult.reason,
         );
         await this.monthRepository.updateMonth(
           monthIdBig,
@@ -669,7 +723,9 @@ export class MonthEventService {
         monthComplete = true;
         bills = billResult;
         futureYouTotal =
-          Number(month.cumulativeFutureYou ?? 0) + futureRemainInMonth;
+          Number(month.cumulativeFutureYou ?? 0) -
+          cumulativeFutureYouDeducted +
+          futureRemainInMonth;
         for (const j of jarsAfterPayment) {
           spendingSummary[j.jarCode] = Number(j.spentAmount);
         }
@@ -711,22 +767,14 @@ export class MonthEventService {
 
     if (txResult.monthComplete) {
       if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
-        await this.runRepository.completeRun(
-          month.budgetRunId,
-          {
-            totalMonths: month.monthIndex,
-            finalFutureYouSavings: txResult.futureYouTotal,
-            passed: true,
-          },
-        );
+        await this.runRepository.completeRun(month.budgetRunId, {
+          totalMonths: month.monthIndex,
+          finalFutureYouSavings: txResult.futureYouTotal,
+          passed: txResult.futureYouTotal > 0,
+        });
         runComplete = true;
       } else {
-        const fullMonth =
-          await this.monthQuery.findMonthWithRunAndJobLevelAndJars(monthIdBig);
-        if (fullMonth) {
-          nextMonthPreview =
-            await this.previewService.computePreview(fullMonth);
-        }
+        nextMonthPreview = await this.previewService.computePreview(month);
       }
     }
 
