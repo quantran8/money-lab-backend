@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import { BudgetSimulationConfigService } from '../config.service';
 import type {
   WeeklyIndexProgressItem,
   WeeklySpendSummary,
-} from '@budget-simulation/domain';
+} from '#budget-simulation/domain/index.js';
 import type {
   MonthWithRunAndJobLevel,
   ChosenEventsTotalsResult,
   ForcedRestNotice,
   IndexWeeklyResolutionResult,
-} from '@budget-simulation/types';
-import { indexResolveWeek } from '@budget-simulation/domain';
-import { DEFAULT_HI_START, DEFAULT_LQI_START } from '@budget-simulation/budget-simulation.constant';
-import { TxClient } from '@app/prisma/transaction.runner';
+} from '#budget-simulation/types/index.js';
+import { indexResolveWeek } from '#budget-simulation/domain/index.js';
+import { DEFAULT_HI_START, DEFAULT_LQI_START } from '#budget-simulation/budget-simulation.constant.js';
+import { TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Handles HI/LQI index: weekly resolution compute + persist.

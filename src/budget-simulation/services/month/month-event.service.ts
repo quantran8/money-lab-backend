@@ -3,12 +3,12 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { clampHi, clampLqi } from '@app/budget-simulation/budget-simulation.helpers';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
-import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
+import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
+import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { BudgetSimulationConfigService } from '../config.service';
-import { JarCode, LqiState } from '@budget-simulation/budget-simulation.enum';
+import { JarCode, LqiState } from '#budget-simulation/budget-simulation.enum.js';
 import {
   BUDGET_SIMULATION_MODULE_ID,
   END_OF_MONTH_WEEK,
@@ -18,7 +18,7 @@ import {
   EVENT_SUBTYPE_OVERTIME,
   FREE_CASH_CODE,
   RUN_MONTH_INDEX_COMPLETE,
-} from '@budget-simulation/budget-simulation.constant';
+} from '#budget-simulation/budget-simulation.constant.js';
 import {
   chooseCategory,
   chooseTemplate,
@@ -27,8 +27,8 @@ import {
   resolveOvertimeEffectsFromJobLevel,
   shouldSpawn,
   shouldSpawnLane,
-} from '@budget-simulation/domain';
-import type { ChosenEventsTotalsResult } from '@budget-simulation/types';
+} from '#budget-simulation/domain/index.js';
+import type { ChosenEventsTotalsResult } from '#budget-simulation/types/index.js';
 import { MonthSpendService } from './month-spend.service';
 import { MonthIndexService } from './month-index.service';
 import { MonthBillService } from './month-bill.service';
@@ -40,8 +40,8 @@ import type {
   LifeEventTemplateWithOptionsRow,
   SpawnEventTemplatePayload,
   PendingEventWithTemplateRow,
-} from '@budget-simulation/types';
-import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
+} from '#budget-simulation/types/index.js';
+import { TransactionRunner, TxClient } from '#app/prisma/transaction.runner.js';
 
 const VALID_JAR_CODES = new Set([
   FREE_CASH_CODE,

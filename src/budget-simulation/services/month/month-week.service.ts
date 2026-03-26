@@ -4,12 +4,12 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
-import { clampHi, clampLqi } from '@app/budget-simulation/budget-simulation.helpers';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
-import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
-import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
+import { wrapAsync } from '#common/utils/async.utils.js';
+import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
+import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { JarCode, SpendModeCode } from '#budget-simulation/budget-simulation.enum.js';
 import {
   END_OF_MONTH_WEEK,
   MAX_EVENTS_PER_WEEK,
@@ -17,9 +17,9 @@ import {
   WEEK_INDEX_COMPLETE_MONTH,
   FORCED_REST_HI_RECOVERY,
   DEFAULT_HI_FALLBACK,
-} from '@budget-simulation/budget-simulation.constant';
-import { jarAvailable, computeJobProgress } from '@budget-simulation/domain';
-import type { JobProgressResult } from '@budget-simulation/domain';
+} from '#budget-simulation/budget-simulation.constant.js';
+import { jarAvailable, computeJobProgress } from '#budget-simulation/domain/index.js';
+import type { JobProgressResult } from '#budget-simulation/domain/index.js';
 import { MonthSpendService } from './month-spend.service';
 import { MonthEventService } from './month-event.service';
 import { MonthIndexService } from './month-index.service';
@@ -32,9 +32,9 @@ import type {
   NextMonthPreview,
   PendingEventWithTemplateRow,
   SpawnEventTemplatePayload,
-} from '@budget-simulation/types';
-import type { RunAnalysisResult } from '@budget-simulation/domain';
-import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
+} from '#budget-simulation/types/index.js';
+import type { RunAnalysisResult } from '#budget-simulation/domain/index.js';
+import { TransactionRunner, TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Data loaded before advancing the month to the next week (two lanes: life + overtime).

@@ -422,6 +422,473 @@ model Lesson {
   @@schema("public")
 }
 
+// ---------------------------------------------------------------------------
+// Invest Simulation (Module 4)
+// ---------------------------------------------------------------------------
+
+model InvestSector {
+  id          Int            @id @default(autoincrement()) @db.SmallInt
+  code        String         @unique
+  name        String
+  description String?
+  sortOrder   Int            @default(0) @map("sort_order") @db.SmallInt
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  assets           InvestAsset[]
+  newsSectorImpacts InvestSimNewsSectorImpact[]
+
+  @@map("invest_sectors")
+  @@schema("public")
+}
+
+model InvestAsset {
+  id                   BigInt                        @id @default(autoincrement())
+  sectorId             Int                           @map("sector_id") @db.SmallInt
+  code                 String                        @unique
+  name                 String
+  assetType            String                        @map("asset_type")
+  riskTier             String                        @map("risk_tier")
+  volatilityProfile    String                        @map("volatility_profile")
+  attentionSensitivity String                        @map("attention_sensitivity")
+  description          String?
+  meta                 Json                          @default("{}") @db.JsonB
+  isActive             Boolean                       @default(true) @map("is_active")
+  createdAt            DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  sector               InvestSector                  @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+  pricePoints          InvestAssetPricePoint[]
+  positions            InvestPortfolioPosition[]
+  transactions         InvestPortfolioTransaction[]
+  newsAssetImpacts     InvestSimNewsAssetImpact[]
+  spotlightInstances   InvestAssetSpotlightInstance[]
+
+  @@index([sectorId], map: "idx_invest_assets_sector")
+  @@index([assetType], map: "idx_invest_assets_type")
+  @@map("invest_assets")
+  @@schema("public")
+}
+
+model InvestMarketTick {
+  id         BigInt                      @id @default(autoincrement())
+  tickIndex  Int                         @unique @map("tick_index")
+  simDay     Int                         @default(0) @map("sim_day")
+  simMonth   Int                         @default(0) @map("sim_month")
+  simYear    Int                         @default(0) @map("sim_year")
+  createdAt  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  worldState  InvestWorldStateAtTick?
+  pricePoints InvestAssetPricePoint[]
+  events      InvestMarketEventLog[]
+  newsItems   InvestSimNewsItem[]
+
+  @@map("invest_market_ticks")
+  @@schema("public")
+}
+
+model InvestWorldStateAtTick {
+  id        BigInt           @id @default(autoincrement())
+  tickId    BigInt           @unique @map("tick_id")
+  stateData Json             @default("{}") @map("state_data") @db.JsonB
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  tick      InvestMarketTick @relation(fields: [tickId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("invest_world_state_at_tick")
+  @@schema("public")
+}
+
+model InvestAssetPricePoint {
+  id             BigInt           @id @default(autoincrement())
+  assetId        BigInt           @map("asset_id")
+  tickId         BigInt           @map("tick_id")
+  price          Int
+  changeFromPrev Int              @default(0) @map("change_from_prev")
+  changePct      Decimal          @default(0) @map("change_pct") @db.Decimal(8, 4)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset          InvestAsset      @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  tick           InvestMarketTick @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+
+  @@unique([assetId, tickId])
+  @@index([tickId], map: "idx_invest_price_points_tick")
+  @@index([assetId], map: "idx_invest_price_points_asset")
+  @@map("invest_asset_price_points")
+  @@schema("public")
+}
+
+model InvestMarketEventTemplate {
+  id           BigInt                 @id @default(autoincrement())
+  title        String
+  description  String?
+  isPositive   Boolean                @default(true) @map("is_positive")
+  impactMinPct Decimal                @default(0) @map("impact_min_pct") @db.Decimal(8, 4)
+  impactMaxPct Decimal                @default(0) @map("impact_max_pct") @db.Decimal(8, 4)
+  rarity       Int                    @default(1) @db.SmallInt
+  meta         Json                   @default("{}") @db.JsonB
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  events       InvestMarketEventLog[]
+
+  @@map("invest_market_event_templates")
+  @@schema("public")
+}
+
+model InvestMarketEventLog {
+  id               BigInt                    @id @default(autoincrement())
+  tickId           BigInt                    @map("tick_id")
+  eventTemplateId  BigInt                    @map("event_template_id")
+  appliedImpactPct Decimal                   @default(0) @map("applied_impact_pct") @db.Decimal(8, 4)
+  appliedMeta      Json                      @default("{}") @map("applied_meta") @db.JsonB
+  occurredAt       DateTime                  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  tick             InvestMarketTick          @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+  template         InvestMarketEventTemplate @relation(fields: [eventTemplateId], references: [id], onUpdate: NoAction)
+
+  @@index([tickId], map: "idx_invest_event_log_tick")
+  @@map("invest_market_event_log")
+  @@schema("public")
+}
+
+model InvestUserCredit {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  balance   Int      @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("invest_user_credits")
+  @@schema("public")
+}
+
+model InvestPortfolioPosition {
+  id          BigInt      @id @default(autoincrement())
+  userId      String      @map("user_id") @db.Uuid
+  assetId     BigInt      @map("asset_id")
+  quantity    Int         @default(0)
+  avgBuyPrice Int         @default(0) @map("avg_buy_price")
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset       InvestAsset @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  user        users       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, assetId])
+  @@index([userId], map: "idx_invest_positions_user")
+  @@index([assetId], map: "idx_invest_positions_asset")
+  @@map("invest_portfolio_positions")
+  @@schema("public")
+}
+
+model InvestPortfolioTransaction {
+  id           BigInt      @id @default(autoincrement())
+  userId       String      @map("user_id") @db.Uuid
+  assetId      BigInt      @map("asset_id")
+  tickId       BigInt      @map("tick_id")
+  side         String
+  quantity     Int
+  pricePerUnit Int         @map("price_per_unit")
+  totalAmount  Int         @map("total_amount")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset        InvestAsset @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  user         users       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "idx_invest_transactions_user")
+  @@index([assetId], map: "idx_invest_transactions_asset")
+  @@index([userId, createdAt], map: "idx_invest_transactions_user_time")
+  @@map("invest_portfolio_transactions")
+  @@schema("public")
+}
+
+// ---------------------------------------------------------------------------
+// Invest Simulation — Phase 2: News, Spotlights, World Arcs
+// ---------------------------------------------------------------------------
+
+model InvestSimNewsItem {
+  id           BigInt                      @id @default(autoincrement())
+  tickId       BigInt                      @map("tick_id")
+  simDay       Int                         @default(0) @map("sim_day")
+  simMonth     Int                         @default(0) @map("sim_month")
+  simYear      Int                         @default(0) @map("sim_year")
+  title        String
+  body         String?
+  tone         String                      @default("neutral")
+  intensity    Decimal                     @default(0) @db.Decimal(5, 2)
+  narrativeTag String?                     @map("narrative_tag")
+  createdAt    DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  tick         InvestMarketTick            @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+  assetImpacts InvestSimNewsAssetImpact[]
+  sectorImpacts InvestSimNewsSectorImpact[]
+
+  @@index([tickId], map: "idx_invest_news_tick")
+  @@map("invest_sim_news_items")
+  @@schema("public")
+}
+
+model InvestSimNewsAssetImpact {
+  id        BigInt           @id @default(autoincrement())
+  newsId    BigInt           @map("news_id")
+  assetId   BigInt           @map("asset_id")
+  impactPct Decimal          @default(0) @map("impact_pct") @db.Decimal(8, 4)
+  news      InvestSimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  asset     InvestAsset       @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+
+  @@index([newsId], map: "idx_invest_news_asset_impact_news")
+  @@map("invest_sim_news_asset_impacts")
+  @@schema("public")
+}
+
+model InvestSimNewsSectorImpact {
+  id        BigInt            @id @default(autoincrement())
+  newsId    BigInt            @map("news_id")
+  sectorId  Int               @map("sector_id") @db.SmallInt
+  impactPct Decimal           @default(0) @map("impact_pct") @db.Decimal(8, 4)
+  news      InvestSimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sector    InvestSector      @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+
+  @@index([newsId], map: "idx_invest_news_sector_impact_news")
+  @@map("invest_sim_news_sector_impacts")
+  @@schema("public")
+}
+
+model InvestAssetSpotlightTemplate {
+  id          BigInt                        @id @default(autoincrement())
+  code        String                        @unique
+  title       String
+  description String?
+  rarity      Int                           @default(1) @db.SmallInt
+  meta        Json                          @default("{}") @db.JsonB
+  createdAt   DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  instances   InvestAssetSpotlightInstance[]
+
+  @@map("invest_asset_spotlight_templates")
+  @@schema("public")
+}
+
+model InvestAssetSpotlightInstance {
+  id                  BigInt                       @id @default(autoincrement())
+  templateId          BigInt                       @map("template_id")
+  assetId             BigInt                       @map("asset_id")
+  state               String                       @default("dormant")
+  ticksInCurrentState Int                          @default(0) @map("ticks_in_current_state")
+  startedAtTick       Int                          @map("started_at_tick")
+  endedAtTick         Int?                         @map("ended_at_tick")
+  cooldownUntilTick   Int?                         @map("cooldown_until_tick")
+  isActive            Boolean                      @default(true) @map("is_active")
+  meta                Json                         @default("{}") @db.JsonB
+  createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  template            InvestAssetSpotlightTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+  asset               InvestAsset                  @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+
+  @@index([assetId], map: "idx_invest_spotlight_inst_asset")
+  @@index([isActive], map: "idx_invest_spotlight_inst_active")
+  @@map("invest_asset_spotlight_instances")
+  @@schema("public")
+}
+
+model InvestWorldArcType {
+  id          Int                      @id @default(autoincrement()) @db.SmallInt
+  code        String                   @unique
+  name        String
+  description String?
+  instances   InvestWorldArcInstance[]
+
+  @@map("invest_world_arc_types")
+  @@schema("public")
+}
+
+model InvestWorldArcInstance {
+  id             BigInt             @id @default(autoincrement())
+  arcTypeId      Int                @map("arc_type_id") @db.SmallInt
+  state          String             @default("background")
+  ticksInCurrentState Int           @default(0) @map("ticks_in_current_state")
+  progress       Decimal            @default(0) @db.Decimal(5, 2)
+  startedAtTick  Int                @map("started_at_tick")
+  endedAtTick    Int?               @map("ended_at_tick")
+  isActive       Boolean            @default(true) @map("is_active")
+  meta           Json               @default("{}") @db.JsonB
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  arcType        InvestWorldArcType @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
+
+  @@index([isActive], map: "idx_invest_arc_inst_active")
+  @@map("invest_world_arc_instances")
+  @@schema("public")
+}
+
+model InvestPolicyThreadTemplate {
+  id          BigInt                       @id @default(autoincrement())
+  code        String                       @unique
+  title       String
+  description String?
+  rarity      Int                          @default(1) @db.SmallInt
+  meta        Json                         @default("{}") @db.JsonB
+  createdAt   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  instances   InvestPolicyThreadInstance[]
+
+  @@map("invest_policy_thread_templates")
+  @@schema("public")
+}
+
+// ---------------------------------------------------------------------------
+// Invest Simulation — Phase 3: Policy Threads, Behavior, Scoring
+// ---------------------------------------------------------------------------
+
+model InvestPolicyThreadInstance {
+  id                  BigInt                       @id @default(autoincrement())
+  templateId          BigInt                       @map("template_id")
+  state               String                       @default("undeclared")
+  ticksInCurrentState Int                          @default(0) @map("ticks_in_current_state")
+  actionsTotal        Int                          @default(3) @map("actions_total") @db.SmallInt
+  actionsCompleted    Int                          @default(0) @map("actions_completed") @db.SmallInt
+  startedAtTick       Int                          @map("started_at_tick")
+  resolvedAtTick      Int?                         @map("resolved_at_tick")
+  isActive            Boolean                      @default(true) @map("is_active")
+  meta                Json                         @default("{}") @db.JsonB
+  createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  template            InvestPolicyThreadTemplate   @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+
+  @@index([isActive], map: "idx_invest_policy_inst_active")
+  @@map("invest_policy_thread_instances")
+  @@schema("public")
+}
+
+model InvestBehaviorWindow {
+  id              BigInt                       @id @default(autoincrement())
+  windowType      String                       @map("window_type")
+  startTickIndex  Int                          @map("start_tick_index")
+  endTickIndex    Int?                         @map("end_tick_index")
+  triggerReason   String                       @map("trigger_reason")
+  isOpen          Boolean                      @default(true) @map("is_open")
+  createdAt       DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  snapshots       InvestUserBehaviorSnapshot[]
+
+  @@index([isOpen], map: "idx_invest_bw_open")
+  @@map("invest_behavior_windows")
+  @@schema("public")
+}
+
+model InvestUserBehaviorSnapshot {
+  id                     BigInt              @id @default(autoincrement())
+  userId                 String              @map("user_id") @db.Uuid
+  windowId               BigInt              @map("window_id")
+  turnoverScore          Decimal             @default(0) @map("turnover_score") @db.Decimal(8, 4)
+  reactionTimeScore      Decimal             @default(0) @map("reaction_time_score") @db.Decimal(8, 4)
+  concentrationChange    Decimal             @default(0) @map("concentration_change") @db.Decimal(8, 4)
+  volatilityChasingScore Decimal             @default(0) @map("volatility_chasing_score") @db.Decimal(8, 4)
+  exposureBySector       Json                @default("{}") @map("exposure_by_sector") @db.JsonB
+  exposureByAssetType    Json                @default("{}") @map("exposure_by_asset_type") @db.JsonB
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  window                 InvestBehaviorWindow @relation(fields: [windowId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "idx_invest_behavior_snap_user")
+  @@index([windowId], map: "idx_invest_behavior_snap_window")
+  @@map("invest_user_behavior_snapshots")
+  @@schema("public")
+}
+
+model InvestUserStabilityMetric {
+  id                   BigInt   @id @default(autoincrement())
+  userId               String   @map("user_id") @db.Uuid
+  tickIndex            Int      @map("tick_index")
+  diversificationScore Decimal  @default(0) @map("diversification_score") @db.Decimal(8, 4)
+  volatilityScore      Decimal  @default(0) @map("volatility_score") @db.Decimal(8, 4)
+  concentrationPenalty Decimal  @default(0) @map("concentration_penalty") @db.Decimal(8, 4)
+  holdingDurationScore Decimal  @default(0) @map("holding_duration_score") @db.Decimal(8, 4)
+  stabilityFactor      Decimal  @default(1) @map("stability_factor") @db.Decimal(8, 4)
+  calculatedAt         DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+
+  @@index([userId], map: "idx_invest_stability_user")
+  @@index([userId, tickIndex], map: "idx_invest_stability_user_tick")
+  @@map("invest_user_stability_metrics")
+  @@schema("public")
+}
+
+model InvestUserScore {
+  userId           String   @id @map("user_id") @db.Uuid
+  wealthPoints     Decimal  @default(0) @map("wealth_points") @db.Decimal(12, 2)
+  stabilityFactor  Decimal  @default(1) @map("stability_factor") @db.Decimal(8, 4)
+  wealthTier       String   @default("beginner") @map("wealth_tier")
+  lastCalculatedAt DateTime @default(now()) @map("last_calculated_at") @db.Timestamptz(6)
+
+  @@map("invest_user_scores")
+  @@schema("public")
+}
+
+// ---------------------------------------------------------------------------
+// Invest Simulation — Phase 4: Reflections, Missions, Reports
+// ---------------------------------------------------------------------------
+
+model InvestReflectionTemplate {
+  id           BigInt               @id @default(autoincrement())
+  code         String               @unique
+  title        String
+  bodyTemplate String               @map("body_template")
+  condition    Json                 @default("{}") @db.JsonB
+  meta         Json                 @default("{}") @db.JsonB
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  reflections  InvestUserReflection[]
+
+  @@map("invest_reflection_templates")
+  @@schema("public")
+}
+
+model InvestUserReflection {
+  id             BigInt                   @id @default(autoincrement())
+  userId         String                   @map("user_id") @db.Uuid
+  tickIndex      Int                      @map("tick_index")
+  templateId     BigInt                   @map("template_id")
+  reflectionText String                   @map("reflection_text")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  template       InvestReflectionTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+
+  @@index([userId], map: "idx_invest_reflections_user")
+  @@index([userId, tickIndex], map: "idx_invest_reflections_user_tick")
+  @@map("invest_user_reflections")
+  @@schema("public")
+}
+
+model InvestMission {
+  id            BigInt              @id @default(autoincrement())
+  code          String              @unique
+  title         String
+  description   String?
+  condition     Json                @default("{}") @db.JsonB
+  rewardCredits Int                 @default(0) @map("reward_credits")
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  userMissions  InvestUserMission[]
+
+  @@map("invest_missions")
+  @@schema("public")
+}
+
+model InvestUserMission {
+  id          BigInt        @id @default(autoincrement())
+  userId      String        @map("user_id") @db.Uuid
+  missionId   BigInt        @map("mission_id")
+  status      String        @default("active")
+  progress    Json          @default("{}") @db.JsonB
+  unlockedAt  DateTime      @default(now()) @map("unlocked_at") @db.Timestamptz(6)
+  completedAt DateTime?     @map("completed_at") @db.Timestamptz(6)
+  mission     InvestMission @relation(fields: [missionId], references: [id], onUpdate: NoAction)
+
+  @@unique([userId, missionId])
+  @@index([userId], map: "idx_invest_user_missions_user")
+  @@map("invest_user_missions")
+  @@schema("public")
+}
+
+model InvestSimReport {
+  id                BigInt   @id @default(autoincrement())
+  userId            String   @map("user_id") @db.Uuid
+  tickIndex         Int      @map("tick_index")
+  simDay            Int      @map("sim_day")
+  simMonth          Int      @map("sim_month")
+  simYear           Int      @map("sim_year")
+  sectorExposure    Json     @default("{}") @map("sector_exposure") @db.JsonB
+  assetTypeExposure Json     @default("{}") @map("asset_type_exposure") @db.JsonB
+  avgVolatility     Decimal  @default(0) @map("avg_volatility") @db.Decimal(8, 4)
+  stabilityScore    Decimal  @default(0) @map("stability_score") @db.Decimal(8, 4)
+  reflectionSummary String?  @map("reflection_summary")
+  generatedAt       DateTime @default(now()) @map("generated_at") @db.Timestamptz(6)
+
+  @@index([userId], map: "idx_invest_reports_user")
+  @@index([userId, tickIndex], map: "idx_invest_reports_user_tick")
+  @@map("invest_sim_reports")
+  @@schema("public")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model audit_log_entries {
@@ -861,6 +1328,9 @@ model users {
   budgetRuns                  BudgetRun[]
   profiles                    Profile?
   jobStates                   UserJobState[]
+  investCredits               InvestUserCredit?
+  investPositions             InvestPortfolioPosition[]
+  investTransactions          InvestPortfolioTransaction[]
 
   @@index([instance_id])
   @@index([is_anonymous])

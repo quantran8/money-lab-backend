@@ -4,16 +4,16 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
+import { wrapAsync } from '#common/utils/async.utils.js';
 import { BudgetRunQuery } from '../../queries/run.query';
-import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
+import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { CommitmentQuery } from '../../queries/commitment.query';
 import type {
   OptionalCommitmentUpdateInput,
   RunCommitmentWorkingRow,
   UpdateRunCommitmentsResult,
 } from '../../types/run-commitment.types';
-import { TransactionRunner } from '@app/prisma/transaction.runner';
+import { TransactionRunner } from '#app/prisma/transaction.runner.js';
 
 /**
  * Run sub-service: updateRunCommitments (core map + optional templates).

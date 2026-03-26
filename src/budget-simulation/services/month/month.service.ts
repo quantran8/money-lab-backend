@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
+import { wrapAsync } from '#common/utils/async.utils.js';
 import { Logger } from '@nestjs/common';
 import { MonthWeekService } from './month-week.service';
 import { MonthEventService } from './month-event.service';

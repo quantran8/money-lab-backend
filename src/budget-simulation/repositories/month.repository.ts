@@ -1,7 +1,7 @@
-import { TxClient } from '@app/prisma/transaction.runner';
+import { TxClient } from '#app/prisma/transaction.runner.js';
 import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { PrismaService } from '@prisma/prisma.service';
+import { PrismaService } from '#app/prisma/prisma.service.js';
 
 /**
  * Write operations for budget months, bill/index resolution, jars, and events.

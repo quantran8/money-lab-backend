@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
-import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
-import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
-import type { WeeklySpendSummary, WeeklySpendResult } from '@budget-simulation/domain';
-import { buildJarAvailableMap, computeWeeklySpend, jarAvailable } from '@budget-simulation/domain';
-import type { BudgetSimulationModuleConfig } from '@budget-simulation/budget-simulation.constant';
-import { TxClient } from '@app/prisma/transaction.runner';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
+import { CommitmentQuery } from '#budget-simulation/queries/commitment.query.js';
+import { JarCode, SpendModeCode } from '#budget-simulation/budget-simulation.enum.js';
+import type { WeeklySpendSummary, WeeklySpendResult } from '#budget-simulation/domain/index.js';
+import { buildJarAvailableMap, computeWeeklySpend, jarAvailable } from '#budget-simulation/domain/index.js';
+import type { BudgetSimulationModuleConfig } from '#budget-simulation/budget-simulation.constant.js';
+import { TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Handles jar spending only: compute weekly spend, apply spend log, jar availability.

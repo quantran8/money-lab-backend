@@ -1,12 +1,12 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
-import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
+import { wrapAsync } from '#common/utils/async.utils.js';
+import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
 import {
   analyzeRun,
   type AnalyzeMonthInput,
   type RunAnalysisResult,
-} from '@budget-simulation/domain';
-import type { RunWithAllMonthsRow } from '@budget-simulation/types/run.types';
+} from '#budget-simulation/domain/index.js';
+import type { RunWithAllMonthsRow } from '#budget-simulation/types/run.types.js';
 
 type MonthRow = RunWithAllMonthsRow['months'][number];
 

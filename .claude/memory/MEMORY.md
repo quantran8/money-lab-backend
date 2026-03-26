@@ -18,3 +18,9 @@
 - [month-support-services.md](logic_map/budget-simulation/month-support-services.md) — MonthSpendService, MonthIndexService, MonthBillService, NextMonthPreview, ConfigService, SetupService
 - [queries-repositories.md](logic_map/budget-simulation/queries-repositories.md) — All queries (run, month, commitment, module) and repositories (run, month)
 - [domain-helpers.md](logic_map/budget-simulation/domain-helpers.md) — Pure domain functions (spending, index, bills, events, income, OT) and helper utilities
+
+## Domain Maps — Invest Simulation
+- [overview.md](domain/invest-simulation/overview.md) — Module 4 concept, entities, trading rules, price model, phases
+
+## Logic Maps — Invest Simulation
+- [overview.md](logic_map/invest-simulation/overview.md) — Phase 1 API endpoints, trade/portfolio flows, file map

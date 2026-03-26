@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '@prisma/prisma.service';
+import { PrismaService } from '#app/prisma/prisma.service.js';
 import {
   BILL_RESERVE_OPTIONS,
   SPEND_MODE_OPTIONS,

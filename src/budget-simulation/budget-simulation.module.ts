@@ -20,7 +20,7 @@ import { CommitmentQuery } from './queries/commitment.query';
 import { ModuleQuery } from './queries/module.query';
 import { BudgetRunRepository } from './repositories/run.repository';
 import { BudgetMonthRepository } from './repositories/month.repository';
-import { TransactionRunner } from '@app/prisma/transaction.runner';
+import { TransactionRunner } from '#app/prisma/transaction.runner.js';
 
 @Global()
 @Module({

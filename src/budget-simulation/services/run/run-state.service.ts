@@ -4,21 +4,21 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
-import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
+import { wrapAsync } from '#common/utils/async.utils.js';
+import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import {
   FREE_CASH_CODE,
   WEEK_INDEX_COMPLETE_MONTH,
-} from '@budget-simulation/budget-simulation.constant';
+} from '#budget-simulation/budget-simulation.constant.js';
 import { BudgetSimulationConfigService } from '../config.service';
 import { NextMonthPreviewService } from '../month/next-month-preview.service';
-import type { ActiveRunWithDetailsRow } from '@budget-simulation/types/run.types';
+import type { ActiveRunWithDetailsRow } from '#budget-simulation/types/run.types.js';
 import type {
   MonthWithRunAndJobLevelAndJars,
   NextMonthPreview,
-} from '@budget-simulation/types/month.types';
-import type { SpawnEventTemplatePayload } from '@budget-simulation/types/event.types';
+} from '#budget-simulation/types/month.types.js';
+import type { SpawnEventTemplatePayload } from '#budget-simulation/types/event.types.js';
 
 // ── pure helpers (no DB, no DI) ──────────────────────────────────
 

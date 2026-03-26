@@ -1,15 +1,15 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
-import { END_OF_MONTH_WEEK } from '@budget-simulation/budget-simulation.constant';
-import { computeBills as domainComputeBills, billsReconcile } from '@budget-simulation/domain';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
+import { END_OF_MONTH_WEEK } from '#budget-simulation/budget-simulation.constant.js';
+import { computeBills as domainComputeBills, billsReconcile } from '#budget-simulation/domain/index.js';
 import { MonthSpendService } from './month-spend.service';
 import type {
   BillsComputeResult,
   ReconcileBillsContext,
-} from '@budget-simulation/types';
-import { JarCode } from '@app/budget-simulation/budget-simulation.enum';
-import { TxClient } from '@app/prisma/transaction.runner';
+} from '#budget-simulation/types/index.js';
+import { JarCode } from '#app/budget-simulation/budget-simulation.enum.js';
+import { TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Handles bill reconciliation: finalize bills, reconcile with jars, persist.

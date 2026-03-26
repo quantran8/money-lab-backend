@@ -5,15 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { wrapAsync } from '@common/utils/async.utils';
-import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
-import { BudgetRunRepository } from '@budget-simulation/repositories/run.repository';
-import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
-import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
+import { wrapAsync } from '#common/utils/async.utils.js';
+import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
+import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
+import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import {
   CommitmentLayer,
   JarCode,
-} from '@budget-simulation/budget-simulation.enum';
+} from '#budget-simulation/budget-simulation.enum.js';
 import {
   BILL_RESERVE_OPTIONS,
   DEFAULT_HI_START,
@@ -22,20 +22,20 @@ import {
   DEFAULT_LQI_START,
   FIRST_MONTH_INDEX,
   FREE_CASH_CODE,
-} from '@budget-simulation/budget-simulation.constant';
-import { resolveLqiState } from '@budget-simulation/budget-simulation.helpers';
+} from '#budget-simulation/budget-simulation.constant.js';
+import { resolveLqiState } from '#budget-simulation/budget-simulation.helpers.js';
 import { BudgetSimulationConfigService } from '../config.service';
 import type {
   OptionalCommitmentUpdateInput,
   UpdateRunCommitmentsResult,
-} from '@budget-simulation/types/run-commitment.types';
+} from '#budget-simulation/types/run-commitment.types.js';
 import { BudgetSimulationRunCommitmentService } from './run-commitment.service';
 import { BudgetSimulationRunStateService } from './run-state.service';
 import {
   calculateMonthIncome,
   resolveBaseJobIncome,
-} from '@budget-simulation/domain';
-import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
+} from '#budget-simulation/domain/index.js';
+import { TransactionRunner, TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Aggregate run service. Sub-services live under services/run/ (e.g. run-commitment.service).

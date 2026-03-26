@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/quantran/Work/ML/money-lab-backend/.claude/memory/domain/invest-simulation"
+    ],
+    "allow": [
+      "Bash(xargs perl:*)"
+    ]
+  }
+}

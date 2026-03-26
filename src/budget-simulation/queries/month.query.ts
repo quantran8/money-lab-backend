@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@prisma/prisma.service';
+import { PrismaService } from '#app/prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import {
   EVENT_SOURCE_LIFE,
@@ -24,7 +24,7 @@ import type {
   ModuleEventPoolWeightRow,
   LifeEventOptionRow,
 } from '../types/event.types';
-import { TxClient } from '@app/prisma/transaction.runner';
+import { TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
  * Read-only data access for budget months, jars, bill/index resolution, and life events.

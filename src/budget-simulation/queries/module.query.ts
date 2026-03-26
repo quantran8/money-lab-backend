@@ -1,4 +1,4 @@
-import { PrismaService } from '@app/prisma/prisma.service';
+import { PrismaService } from '#app/prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
 import {
   DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG,

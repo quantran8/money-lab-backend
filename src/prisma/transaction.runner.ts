@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@app/prisma/prisma.service';
+import { PrismaService } from '#app/prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 
 /** Client for use inside $transaction; accepts both PrismaService and tx from $transaction callback. */

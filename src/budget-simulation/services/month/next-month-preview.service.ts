@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { BudgetRunQuery } from '@budget-simulation/queries/run.query';
+import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
 import {
   BillReserveOptionCode,
   CommitmentLayer,
   JarCode,
-} from '@budget-simulation/budget-simulation.enum';
-import { getBillReserveCoveragePct } from '@budget-simulation/budget-simulation.constant';
-import { resolveBaseJobIncome } from '@budget-simulation/domain';
+} from '#budget-simulation/budget-simulation.enum.js';
+import { getBillReserveCoveragePct } from '#budget-simulation/budget-simulation.constant.js';
+import { resolveBaseJobIncome } from '#budget-simulation/domain/index.js';
 import { BudgetSimulationConfigService } from '../config.service';
-import type { MonthWithRunAndJobLevelAndJars } from '@budget-simulation/types/month.types';
-import type { NextMonthPreview } from '@budget-simulation/types/month.types';
+import type { MonthWithRunAndJobLevelAndJars } from '#budget-simulation/types/month.types.js';
+import type { NextMonthPreview } from '#budget-simulation/types/month.types.js';
 
 @Injectable()
 export class NextMonthPreviewService {

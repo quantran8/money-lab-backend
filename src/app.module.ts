@@ -6,10 +6,11 @@ import { PrismaService } from './prisma/prisma.service';
 import { AuthModule } from './auth/auth.module';
 import { LearnModule } from './learn/learn.module';
 import { BudgetModule } from './budget-simulation/budget-simulation.module';
+import { InvestModule } from './invest-simulation/invest-simulation.module';
 
 @Global()
 @Module({
-  imports: [AuthModule, LearnModule, BudgetModule],
+  imports: [AuthModule, LearnModule, BudgetModule, InvestModule],
   controllers: [AppController],
   providers: [AppService, SupabaseService, PrismaService],
   exports: [SupabaseService, PrismaService],

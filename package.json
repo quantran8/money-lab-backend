@@ -5,6 +5,11 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "imports": {
+    "#app/*": "./src/*",
+    "#budget-simulation/*": "./src/budget-simulation/*",
+    "#common/*": "./src/common/*"
+  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -76,6 +81,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^#app/(.*)$": "<rootDir>/$1",
+      "^#budget-simulation/(.*)$": "<rootDir>/budget-simulation/$1",
+      "^#common/(.*)$": "<rootDir>/common/$1"
+    }
   }
 }

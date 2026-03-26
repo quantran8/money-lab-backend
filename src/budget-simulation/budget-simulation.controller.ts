@@ -7,8 +7,8 @@ import {
   ApplyEventChoiceDto,
   UpdateRunCommitmentsDto,
 } from './dto';
-import { AuthGuard } from 'src/auth/auth.guard';
-import { getUserId } from 'src/common/utils/auth.utils';
+import { AuthGuard } from '#app/auth/auth.guard.js';
+import { getUserId } from '#common/utils/auth.utils.js';
 
 
 @Controller('budget-simulation')
