@@ -61,8 +61,47 @@ Deterministic via `genAutoSpendLabel()` — MD5-seeded selection from prefix/ver
 
 ---
 
+## Learning Jar XP (from Auto-Spend)
+
+Weekly learning spend generates XP via soft cap system:
+
+```
+Step 1 — Load config.progressionSystem
+Step 2 — Compute learningCap:
+  baseCap = config.progressionSystem.learningXp.baseCap
+  jobModifier = jobLevels.levels[currentLevel].learningCapModifier
+  hiEfficiency = getHiEfficiency(playerHI, config)
+    HI >= 70 → high (1.0); 40 ≤ HI < 70 → mid (0.9); HI < 40 → low (0.75)
+  learningCap = baseCap * jobModifier * hiEfficiency
+
+Step 3 — Compute XP (soft cap):
+  if learningSpend <= learningCap:
+    xp = learningSpend * xpRate
+  else:
+    xp = learningCap * xpRate + (learningSpend - learningCap) * reducedXpRate
+  xp = round(xp)
+
+Step 4 — Level up (checked elsewhere):
+  if xp >= nextLevel.xpRequiredTotal → level++
+```
+
+**Config (progressionSystem.learningXp):**
+- `baseCap`: 100
+- `xpRate`: 0.8
+- `reducedXpRate`: 0.3
+- `hiEfficiency`: { low: 0.75, mid: 0.9, high: 1.0 }
+
+**Config (progressionSystem.jobLevels.levels):**
+- Level 1: learningCapModifier = 1.0
+- Level 2: learningCapModifier = 1.05
+- Level 3: learningCapModifier = 1.10
+
+XP is persisted via `incrementUserJobStateXpBounded()` in the weekly transaction alongside spend ops.
+
+---
+
 ## Code Location
 
-- Domain: `domain/spending/spending-calculator.ts` — `jarAvailable()`, `buildJarAvailableMap()`, `computeWeeklySpend()`
+- Domain: `domain/spending/spending-calculator.ts` — `jarAvailable()`, `buildJarAvailableMap()`, `computeWeeklySpend()`, `computeLearningXp()`, `getHiEfficiency()`
 - Helpers: `budget-simulation.helpers.ts` — `genAutoSpendLabel()`
 - Service: `services/month/month-spend.service.ts` — `getSpendModeRate()`, `applyWeeklySpend()`, `addSpendLog()`

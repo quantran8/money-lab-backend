@@ -74,6 +74,23 @@ type: reference
 
 ---
 
+---
+
+## RunAnalyzeService
+**File:** `services/run/run-analyze.service.ts`
+
+### analyzeRun(runId: number): Promise<RunAnalysisResult>
+1. Load full run with all months (ordered asc) via `BudgetRunQuery.findRunWithAllMonths()`
+   - Includes: jobState + job, months → jars, billResolution, indexResolution, events + option
+2. Map each month to `AnalyzeMonthInput` (Prisma Decimal → number conversions)
+3. Call pure domain function `analyzeRun()` from `domain/analyze/run-analyzer.ts`
+4. Return `RunAnalysisResult`
+
+**Called by:** `MonthWeekService.resolveWeek()` — only when `runComplete = true`
+**Query:** `BudgetRunQuery.findRunWithAllMonths()` → type `RunWithAllMonthsRow`
+
+---
+
 ## Queries Used
 - `BudgetRunQuery.findJobWithLevel1()` — startBudgetRun
 - `BudgetRunQuery.findRunWithJobState()` — startMonth

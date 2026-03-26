@@ -14,7 +14,10 @@ import {
 import { BudgetSimulationConfigService } from '../config.service';
 import { NextMonthPreviewService } from '../month/next-month-preview.service';
 import type { ActiveRunWithDetailsRow } from '@budget-simulation/types/run.types';
-import type { NextMonthPreview } from '@budget-simulation/types/month.types';
+import type {
+  MonthWithRunAndJobLevelAndJars,
+  NextMonthPreview,
+} from '@budget-simulation/types/month.types';
 import type { SpawnEventTemplatePayload } from '@budget-simulation/types/event.types';
 
 // ── pure helpers (no DB, no DI) ──────────────────────────────────
@@ -112,6 +115,7 @@ export class BudgetSimulationRunStateService {
       );
 
       const [nextMonthPreview, pendingEvents] = await this.resolveEnrichments(
+        run,
         latestMonth,
         monthResolved,
       );
@@ -188,20 +192,19 @@ export class BudgetSimulationRunStateService {
   }
 
   private async resolveEnrichments(
+    run: ActiveRunWithDetailsRow,
     latestMonth: MonthRow | undefined,
     monthResolved: boolean,
   ): Promise<
     [NextMonthPreview | undefined, SpawnEventTemplatePayload[] | undefined]
   > {
     if (monthResolved && latestMonth) {
-      const fullMonth =
-        await this.monthQuery.findMonthWithRunAndJobLevelAndJars(
-          latestMonth.id,
-        );
-      if (fullMonth) {
-        const preview = await this.previewService.computePreview(fullMonth);
-        return [preview, undefined];
-      }
+      const fullMonth: MonthWithRunAndJobLevelAndJars = {
+        ...latestMonth,
+        budgetRun: { ...run, jobState: run.jobState! },
+      } as MonthWithRunAndJobLevelAndJars;
+      const preview = await this.previewService.computePreview(fullMonth);
+      return [preview, undefined];
     }
 
     if (latestMonth && latestMonth.currentWeek > 0) {

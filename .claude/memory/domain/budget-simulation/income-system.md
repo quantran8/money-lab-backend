@@ -28,8 +28,11 @@ If HI < hiFloor during a week:
 
 ## Job Leveling & XP
 
-- Learning allocation/events generate `learningXpDelta`
-- XP accumulated on `UserJobState.xp`
+XP sources:
+- **Auto-spend (learning jar):** weekly learning spend → `computeLearningXp()` with soft cap, HI efficiency, job level modifier → `learningXpDelta`
+- **Events:** event options may carry `learningXpDelta` directly
+
+XP accumulated on `UserJobState.xp`
 - Level thresholds defined per `JobLevel.xpRequiredTotal`
 - Level-up effects (next month): income multiplier increase, energy load increase
 - `incrementUserJobStateXpBounded()` — raw SQL, clamps >= 0

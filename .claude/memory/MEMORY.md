@@ -8,6 +8,7 @@
 - [bill-system.md](domain/budget-simulation/bill-system.md) — Bill estimation, variance, reserve, reconciliation waterfall, stress mode
 - [event-system.md](domain/budget-simulation/event-system.md) — Life events (LQI-weighted), OT events (job-based), spawn logic, multi-jar payment
 - [commitment-system.md](domain/budget-simulation/commitment-system.md) — Commitment layers, effective ranges, category rules, guardrail, run completion
+- [analyze-system.md](domain/budget-simulation/analyze-system.md) — Post-run analysis: formulas, thresholds, stability rules, trend slope, insight generation
 
 ## Logic Maps — Budget Simulation
 - [overview.md](logic_map/budget-simulation/overview.md) — Architecture, API endpoints, orchestration flows, transaction boundaries, file map

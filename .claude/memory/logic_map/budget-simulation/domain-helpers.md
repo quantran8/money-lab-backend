@@ -11,9 +11,15 @@ type: reference
 
 - `jarAvailable(allocated, spent, overflowIn, overflowOut)` → `max(0, allocated - spent + overflowIn - overflowOut)`
 - `buildJarAvailableMap(freeCash, jars[])` → `Map<jarCode, available>`
-- `computeWeeklySpend(input)` → `{entries[], weeklySpend{fun,learning,give}, spendOps[]}`
+- `getHiEfficiency(playerHI, config)` → HI efficiency multiplier (>=70→high, >=40→mid, <40→low)
+- `computeLearningXp({learningSpend, playerHI, currentJobLevel, config})` → `{xpGained, learningCap, hiEfficiency}`
+  - Soft cap: spend ≤ cap → full xpRate; excess → reducedXpRate
+  - Cap = baseCap * jobModifier * hiEfficiency
+- `computeWeeklySpend(input)` → `{entries[], weeklySpend{fun,learning,give}, spendOps[], learningXpDelta}`
+  - Input now includes: `playerHI`, `currentJobLevel`, `config`
   - Per jar: `weeklyAmount = floor(round(allocated * spendModeRate) / 4)`
   - Actual: `min(available, weeklyAmount)`
+  - After spend loop: calls `computeLearningXp()` with learning spend amount
 
 ## Index Calculator
 **File:** `domain/index/index-calculator.ts`

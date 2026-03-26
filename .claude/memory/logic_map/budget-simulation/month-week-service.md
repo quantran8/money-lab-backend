@@ -33,6 +33,8 @@ type: reference
 ### Transaction
 a. Advance `currentWeek` → nextWeek
 b. Apply weekly auto-spend via MonthSpendService (fun/learning/give jars)
+   - Also computes `learningXpDelta` from learning jar spend (soft cap with HI efficiency)
+   - If `learningXpDelta > 0` → persists XP via `incrementUserJobStateXpBounded()`
 c. Spawn/load pending life & OT events (unless forced rest blocks events)
    - If spawning: `MonthRepository.createEventWithTemplate()`
    - If already pending: load existing
@@ -45,8 +47,10 @@ e. If END_OF_MONTH_WEEK (week 4) + no pending:
 ### Post-Transaction
 - Clamp HI/LQI to config bounds
 - Check if month complete (week 5 + no pending events)
-- If month complete + monthIndex >= 6 → completeRun()
-- If month complete + monthIndex < 6 → NextMonthPreviewService.computePreview()
+- If month complete:
+  - Compute jobProgress via `computeJobProgress()` domain function
+  - If monthIndex >= 6 → `completeRun()` then `RunAnalyzeService.analyzeRun()` → set `runComplete = true`, `runAnalysis`
+  - If monthIndex < 6 → `NextMonthPreviewService.computePreview()`
 
 ### Response Shape
 - weekAdvanced, currentWeek
@@ -57,6 +61,8 @@ e. If END_OF_MONTH_WEEK (week 4) + no pending:
 - bills (if month completed)
 - nextMonthPreview (if available)
 - monthComplete, runComplete flags
+- **runAnalysis** (RunAnalysisResult — only present when runComplete = true)
+- jobProgress (XP progress — only present when monthComplete = true and jobState exists)
 
 ---
 
@@ -67,3 +73,4 @@ e. If END_OF_MONTH_WEEK (week 4) + no pending:
 - MonthBillService → bill compute + reconciliation
 - NextMonthPreviewService → next month projections
 - BudgetRunRepository → completeRun()
+- **RunAnalyzeService → post-run analysis (called after completeRun)**

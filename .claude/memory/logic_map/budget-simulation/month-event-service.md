@@ -75,7 +75,7 @@ type: reference
 
 ### Post-Transaction
 - Check month complete (week 5 + no pending)
-- If complete + monthIndex >= 6 → completeRun()
+- If complete + monthIndex >= 6 → completeRun() then RunAnalyzeService.analyzeRun() → set runComplete = true, runAnalysis
 - If complete + monthIndex < 6 → compute next month preview
 
 ### Response Shape
@@ -84,6 +84,7 @@ type: reference
 - hiAfter, lqiAfter
 - bills (if month complete)
 - monthComplete, runComplete flags
+- **runAnalysis** (RunAnalysisResult — only present when runComplete = true)
 - overtimeIncomeAccrued (if OT accept)
 - spendingSummary
 - deferredIndex flag

@@ -4,11 +4,18 @@
 export {
   buildJarAvailableMap,
   computeWeeklySpend,
+  computeLearningXp,
+  computeJobProgress,
+  getHiEfficiency,
   jarAvailable,
 } from './spending/spending-calculator';
 export type {
   WeeklySpendInput,
   WeeklySpendResult,
+  LearningXpInput,
+  LearningXpResult,
+  JobProgressInput,
+  JobProgressResult,
   JarState,
   SpendOp,
   WeeklySpendEntry,
@@ -59,3 +66,19 @@ export type {
   EventPoolWeight,
   EventTemplateRef,
 } from './events/event-spawn-engine';
+export { analyzeRun } from './analyze/run-analyzer';
+export type {
+  AnalyzeRunInput,
+  AnalyzeMonthInput,
+  AnalyzeMonthJar,
+  AnalyzeMonthIndex,
+  AnalyzeMonthBill,
+  AnalyzeMonthEvent,
+  RunAnalysisResult,
+  RunOverview,
+  IndicesSection,
+  FinancialsSection,
+  VolatilitySection,
+  KeyMoment,
+  FinalState,
+} from './analyze/run-analyzer';

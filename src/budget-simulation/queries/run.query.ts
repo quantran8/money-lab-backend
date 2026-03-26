@@ -6,6 +6,7 @@ import type {
   ActiveRunWithDetailsRow,
   RunWithJobStateRow,
   RunWithLatestMonthAndCommitmentsRow,
+  RunWithAllMonthsRow,
   UserJobStateLatestRow,
   UserRunCommitmentWithTemplateRow,
 } from '../types/run.types';
@@ -41,7 +42,12 @@ export class BudgetRunQuery {
       where: { userId },
       orderBy: { startedAt: 'desc' },
       include: {
-        jobState: true,
+        jobState: {
+          include: {
+            job: { include: { levels: true } },
+          },
+        },
+        module: true,
         months: {
           orderBy: { monthIndex: 'desc' },
           take: 1,
@@ -90,6 +96,31 @@ export class BudgetRunQuery {
           },
         },
         commitments: { include: { template: true } },
+      },
+    });
+  }
+
+  /** All months for a run ordered asc (for post-run analysis). */
+  async findRunWithAllMonths(
+    runId: bigint,
+  ): Promise<RunWithAllMonthsRow | null> {
+    return this.prisma.budgetRun.findUnique({
+      where: { id: runId },
+      include: {
+        jobState: {
+          include: { job: true },
+        },
+        months: {
+          orderBy: { monthIndex: 'asc' },
+          include: {
+            jars: true,
+            billResolution: true,
+            indexResolution: true,
+            events: {
+              include: { option: true },
+            },
+          },
+        },
       },
     });
   }

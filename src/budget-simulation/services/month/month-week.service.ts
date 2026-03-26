@@ -15,20 +15,25 @@ import {
   MAX_EVENTS_PER_WEEK,
   RUN_MONTH_INDEX_COMPLETE,
   WEEK_INDEX_COMPLETE_MONTH,
+  FORCED_REST_HI_RECOVERY,
+  DEFAULT_HI_FALLBACK,
 } from '@budget-simulation/budget-simulation.constant';
-import { jarAvailable } from '@budget-simulation/domain';
+import { jarAvailable, computeJobProgress } from '@budget-simulation/domain';
+import type { JobProgressResult } from '@budget-simulation/domain';
 import { MonthSpendService } from './month-spend.service';
 import { MonthEventService } from './month-event.service';
 import { MonthIndexService } from './month-index.service';
 import { MonthBillService } from './month-bill.service';
 import { NextMonthPreviewService } from './next-month-preview.service';
 import { BudgetSimulationConfigService } from '../config.service';
+import { RunAnalyzeService } from '../run/run-analyze.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
   NextMonthPreview,
   PendingEventWithTemplateRow,
   SpawnEventTemplatePayload,
 } from '@budget-simulation/types';
+import type { RunAnalysisResult } from '@budget-simulation/domain';
 import { TransactionRunner, TxClient } from '@app/prisma/transaction.runner';
 
 /**
@@ -68,6 +73,7 @@ export class MonthWeekService {
     private readonly billService: MonthBillService,
     private readonly previewService: NextMonthPreviewService,
     private readonly runRepository: BudgetRunRepository,
+    private readonly analyzeService: RunAnalyzeService,
   ) {}
 
   async loadResolveWeekContext(
@@ -167,10 +173,10 @@ export class MonthWeekService {
       const config = this.configService.getConfig();
       const maxForcedRest =
         config.indexRules.stressMode?.maxForcedRestPerMonth ?? 1;
-      const hiRecoveryFromForcedRest = 5;
+      const hiRecoveryFromForcedRest = FORCED_REST_HI_RECOVERY;
 
       const idx = month.indexResolution;
-      const currentHi = idx ? Number(idx.hiEnd ?? idx.hiStart ?? 50) : 50;
+      const currentHi = idx ? Number(idx.hiEnd ?? idx.hiStart ?? DEFAULT_HI_FALLBACK) : DEFAULT_HI_FALLBACK;
       const didForcedRest = !!(
         idx &&
         idx.forcedRestWeek == null &&
@@ -189,11 +195,16 @@ export class MonthWeekService {
             : 0;
       }
 
+      const currentJobLevel = month.budgetRun.jobState?.level ?? 1;
+
       const spendResult = this.spendService.computeWeeklySpend(
         month,
         month.jars,
         spendModeRate,
         nextWeek,
+        currentHi,
+        currentJobLevel,
+        config,
       );
 
       const forcedRestPayload = didForcedRest
@@ -243,16 +254,31 @@ export class MonthWeekService {
           );
         }
 
-        for (const op of spendResult.spendOps) {
-          await this.spendService.addSpendLog(
+        const spendWriteOps: Promise<unknown>[] = spendResult.spendOps.map((op) =>
+          this.spendService.addSpendLog(
             monthIdBig,
             op.jarCode,
             op.amount,
             0,
             0,
             tx,
+          ),
+        );
+
+        if (
+          spendResult.learningXpDelta > 0 &&
+          month.budgetRun.jobStateId != null
+        ) {
+          spendWriteOps.push(
+            this.runRepository.incrementUserJobStateXpBounded(
+              month.budgetRun.jobStateId,
+              spendResult.learningXpDelta,
+              tx,
+            ),
           );
         }
+
+        await Promise.all(spendWriteOps);
 
         const payloads: SpawnEventTemplatePayload[] = [];
 
@@ -266,11 +292,7 @@ export class MonthWeekService {
               nextWeek,
               tx,
             );
-            const row = await this.monthQuery.findPendingEventWithTemplateById(
-              created.id,
-              tx,
-            );
-            if (row) payloads.push(buildPayload(row));
+            payloads.push(buildPayload(created));
           }
           if (overtimeEventPendingForNextWeek) {
             payloads.push(buildPayload(overtimeEventPendingForNextWeek));
@@ -281,11 +303,7 @@ export class MonthWeekService {
               nextWeek,
               tx,
             );
-            const row = await this.monthQuery.findPendingEventWithTemplateById(
-              created.id,
-              tx,
-            );
-            if (row) payloads.push(buildPayload(row));
+            payloads.push(buildPayload(created));
           }
         }
 
@@ -335,7 +353,7 @@ export class MonthWeekService {
           await this.monthRepository.updateMonth(
             monthIdBig,
             {
-              currentWeek: 5,
+              currentWeek: WEEK_INDEX_COMPLETE_MONTH,
               cumulativeFutureYou: { increment: futureRemainInMonth },
             },
             tx,
@@ -374,8 +392,26 @@ export class MonthWeekService {
 
       let nextMonthPreview: NextMonthPreview | undefined;
       let runComplete = false;
+      let runAnalysis: RunAnalysisResult | undefined;
+      let jobProgress: JobProgressResult | undefined;
 
       if (monthComplete) {
+        const jobState = month.budgetRun.jobState;
+        if (jobState) {
+          const levels = (jobState.job?.levels ?? []).map((l) => ({
+            level: l.level,
+            xpRequiredTotal: l.xpRequiredTotal,
+          }));
+          jobProgress = computeJobProgress({
+            currentXp: jobState.xp,
+            xpDelta: spendResult.learningXpDelta,
+            xpByCap: spendResult.learningXpByCap,
+            xpByOverflowCap: spendResult.learningXpByOverflowCap,
+            currentLevel: jobState.level,
+            levels,
+          });
+        }
+
         if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
           await this.runRepository.completeRun(month.budgetRunId, {
             totalMonths: month.monthIndex,
@@ -383,6 +419,9 @@ export class MonthWeekService {
             passed: futureTotal > 0,
           });
           runComplete = true;
+          runAnalysis = await this.analyzeService.analyzeRun(
+            Number(month.budgetRunId),
+          );
         } else {
           nextMonthPreview = await this.previewService.computePreview(month);
         }
@@ -392,7 +431,7 @@ export class MonthWeekService {
         Number(
           refreshedMonth?.indexResolution?.hiEnd ??
             refreshedMonth?.indexResolution?.hiStart ??
-            50,
+            DEFAULT_HI_FALLBACK,
         ),
         config,
       );
@@ -400,7 +439,7 @@ export class MonthWeekService {
         Number(
           refreshedMonth?.indexResolution?.lqiEnd ??
             refreshedMonth?.indexResolution?.lqiStart ??
-            50,
+            DEFAULT_HI_FALLBACK,
         ),
         config,
       );
@@ -429,6 +468,7 @@ export class MonthWeekService {
         pendingEvents: pendingEvents.length > 0 ? pendingEvents : undefined,
         monthComplete,
         runComplete,
+        runAnalysis,
         bills,
         futureYouTotal: futureTotal,
         freeCashBalance,

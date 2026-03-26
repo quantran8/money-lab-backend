@@ -13,6 +13,7 @@ import type {
   IndexWeeklyResolutionResult,
 } from '@budget-simulation/types';
 import { indexResolveWeek } from '@budget-simulation/domain';
+import { DEFAULT_HI_START, DEFAULT_LQI_START } from '@budget-simulation/budget-simulation.constant';
 import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
@@ -49,8 +50,8 @@ export class MonthIndexService {
     const config = this.configService.getConfig();
     const ir = month.indexResolution;
 
-    const hiStart = Number(ir.hiEnd ?? ir.hiStart ?? 70);
-    const lqiStart = Number(ir.lqiEnd ?? ir.lqiStart ?? 70);
+    const hiStart = Number(ir.hiEnd ?? ir.hiStart ?? DEFAULT_HI_START);
+    const lqiStart = Number(ir.lqiEnd ?? ir.lqiStart ?? DEFAULT_LQI_START);
 
     const jobLevel = month.budgetRun?.jobState?.job?.levels.find(
       (l) => l.level === month.budgetRun?.jobState?.level,

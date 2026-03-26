@@ -95,9 +95,11 @@ export class MonthBillService {
       { billReserveEnd: billReserveEnd - reserveTaken },
       tx,
     );
-    for (const { jarCode, amount } of result.jarChanges) {
-      await this.spendService.addSpendLog(monthIdBig, jarCode, 0, 0, amount, tx);
-    }
+    await Promise.all(
+      result.jarChanges.map(({ jarCode, amount }) =>
+        this.spendService.addSpendLog(monthIdBig, jarCode, 0, 0, amount, tx),
+      ),
+    );
     await this.monthRepository.updateMonth(
       monthIdBig,
       {

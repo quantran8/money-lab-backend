@@ -1,7 +1,16 @@
 import { createHash } from 'crypto';
-import type { BudgetSimulationModuleConfig } from './budget-simulation.constant';
+import {
+  type BudgetSimulationModuleConfig,
+  LEARNING_TIER_MICRO_MAX,
+  LEARNING_TIER_BASIC_MAX,
+  LEARNING_TIER_COURSE_MAX,
+  BILL_VARIANCE_CENTER,
+  BILL_VARIANCE_RANGE,
+} from './budget-simulation.constant';
 
 export type LqiState = 'stable' | 'compressed' | 'strained';
+type JarType = 'fun' | 'learning' | 'give';
+
 
 /**
  * Resolves numeric LQI to player-facing state using module index_rules thresholds.
@@ -68,41 +77,218 @@ export function seedInt(seed: string): number {
  * Generates a deterministic autospend label for a jar spend entry.
  * Inputs: seed, jar code, amount, spendMode code, global week index.
  */
+
+function getLearningTier(
+  amount: number,
+): 'micro' | 'basic' | 'course' | 'intensive' {
+  if (amount < LEARNING_TIER_MICRO_MAX) return 'micro';
+  if (amount < LEARNING_TIER_BASIC_MAX) return 'basic';
+  if (amount < LEARNING_TIER_COURSE_MAX) return 'course';
+  return 'intensive';
+}
+
 export function genAutoSpendLabel(
-    seed: string,
-    jar: string,
-    amount: number,
-    spendMode: string,
-    weekGlobal: number
+  seed: string,
+  jarType: String,
+  amount: number,
+  spendMode: string,
+  weekIndex: number,
 ): string {
-    const prefixes = ['Quick moment:', 'Small win:', 'Tiny upgrade:', 'Just life:', 'A little move:', 'No big deal:', 'Slow and steady:', 'Real-world stuff:', 'One step:', 'Today:'];
-    const funVerbs = ['treated yourself', 'caught a vibe', 'went for a little joy', 'did something fun', 'took a breather', 'added some spark', 'picked a small pleasure', 'unwound a bit', 'made the day nicer', 'kept it light'];
-    const learnVerbs = ['put time into skills', 'learned something new', 'invested in growth', 'leveled up a bit', 'built a habit', 'studied a little', 'pushed progress', 'did a mini practice session', 'fed your curiosity', 'kept learning going'];
-    const giveVerbs = ['paid it forward', 'showed some generosity', 'helped someone out', 'shared a bit', 'did a kind thing', 'supported a good cause', 'made a small impact', 'gave with intent', 'sent some kindness', 'did a quiet good deed'];
-    const amountStyles = ['just a bit', 'a small one', 'a decent chunk', 'a quick spend', 'a modest hit', 'a solid slice', 'a tiny drop', 'a clean spend'];
-    const tails = ['— and moved on.', '— no guilt.', '— kept it under control.', '— balanced.', '— nice and simple.', '— still on track.', '— that\'s budgeting.', '— felt right.'];
+  const labelPrefixes = [
+    'Quick moment:',
+    'Low-key move:',
+    'Tiny decision:',
+    'Just life:',
+    'Small shift:',
+    'One step:',
+    'Nothing major:',
+    'Casual choice:',
+    'Real life:',
+    'Today:',
+    'No big drama:',
+    'Kept it simple:',
+    'Small energy:',
+    'Little upgrade:',
+    'Soft move:',
+    'Stayed consistent:',
+    'Another step:',
+    'Nothing fancy:',
+    'Just doing your thing:',
+    'Small play:',
+  ];
 
-    const size = amount <= 15 ? 'tiny' : amount <= 40 ? 'small' : amount <= 80 ? 'medium' : 'big';
+  const funActions = [
+    'treated yourself a little',
+    'went for a quick mood boost',
+    'did something just for you',
+    'kept things light today',
+    'picked a small joy',
+    'gave yourself a break',
+    'made the day a bit better',
+    'took a breather',
+    'added a little fun to the mix',
+    'went for a comfort choice',
+    'said yes to a small want',
+    'took a soft reset moment',
+    'kept the vibes decent',
+    'made space for yourself',
+    'chose a little enjoyment',
+    'went easy on yourself',
+    'kept things from feeling dry',
+    'added some color to the day',
+    'kept it from being all work',
+    'balanced things out a bit',
+    'gave yourself something nice',
+    'made today less boring',
+    'did a tiny vibe upgrade',
+    'kept your energy up',
+    'didn’t overthink it, just enjoyed',
+    'took a small win',
+    'kept things human',
+    'let yourself enjoy something',
+    'did something low-key fun',
+    'kept the day from dragging',
+  ];
 
-    const n1 = Math.abs(seedInt(`${seed}:p`));
-    const n2 = Math.abs(seedInt(`${seed}:v:${jar}`));
-    const n3 = Math.abs(seedInt(`${seed}:a`));
-    const n4 = Math.abs(seedInt(`${seed}:t:${size}:${spendMode}`));
+  const learningActionsByTier = {
+    micro: [
+      'picked up a small resource',
+      'did a quick skill upgrade',
+      'added something small to learn from',
+      'kept your learning going',
+      'put a bit into growth',
+      'stacked a tiny improvement',
+      'kept the momentum alive',
+      'made a small upgrade',
+      'did a quick knowledge boost',
+      'added a small piece to your skills',
+    ],
+    basic: [
+      'grabbed a useful book or tool',
+      'invested in a solid learning resource',
+      'put money into improving your skills',
+      'added something meaningful to your learning',
+      'made a smart growth move',
+      'picked up something worth learning',
+      'put effort into getting better',
+      'leveled up your knowledge a bit',
+      'made a proper learning investment',
+      'added a strong piece to your stack',
+    ],
+    course: [
+      'started a course',
+      'committed to learning something new',
+      'put real effort into leveling up',
+      'invested in a structured program',
+      'took learning more seriously this time',
+      'made a bigger move for your growth',
+      'locked in on improving yourself',
+      'went in on a proper learning step',
+      'chose to upgrade your skills properly',
+      'made a strong investment in yourself',
+    ],
+    intensive: [
+      'committed to a serious program',
+      'went all in on learning',
+      'made a big move for your future',
+      'invested heavily in your growth',
+      'took a major step forward',
+      'put real weight behind your learning',
+      'fully committed to leveling up',
+      'made a high-impact investment in yourself',
+      'took your growth seriously',
+      'went for a major upgrade',
+    ],
+  };
 
-    const i1 = (n1 + weekGlobal) % prefixes.length;
-    const i2 = (n2 + weekGlobal * 3) % 10;
-    const i3 = (n3 + weekGlobal * 5) % amountStyles.length;
-    const i4 = (n4 + weekGlobal * 7) % tails.length;
+  const givingActions = [
+    'helped someone out',
+    'gave a little back',
+    'shared something small',
+    'did a kind thing',
+    'supported someone',
+    'made a small impact',
+    'gave with intention',
+    'put something good out there',
+    'showed up for someone',
+    'did your part',
+    'sent a bit of kindness',
+    'gave without overthinking',
+    'helped where you could',
+    'kept it generous',
+    'did something thoughtful',
+    'made things a bit better',
+    'chose to give a little',
+    'kept it human',
+    'did something that matters',
+    'showed some care',
+  ];
 
-    const prefix = prefixes[i1];
-    const style = amountStyles[i3];
-    const tail = tails[i4];
-    let verb = 'spent automatically';
-    if (jar === 'fun') verb = funVerbs[i2];
-    else if (jar === 'learning') verb = learnVerbs[i2];
-    else if (jar === 'give') verb = giveVerbs[i2];
+  const amountDescriptions = [
+    'just a bit',
+    'a small one',
+    'a decent chunk',
+    'a quick spend',
+    'a modest hit',
+    'a solid slice',
+    'a tiny drop',
+    'a clean spend',
+  ];
 
-    return `${prefix} ${verb} — ${style} ${tail}`;
+  const sentenceEndings = [
+    '— and kept going.',
+    '— nothing dramatic.',
+    '— still in control.',
+    '— that works.',
+    '— clean and simple.',
+    '— no overthinking.',
+    '— stayed balanced.',
+    '— just part of it.',
+    '— all good.',
+    '— makes sense.',
+    '— no regrets there.',
+    '— solid choice.',
+    '— kept it moving.',
+    '— that’s life.',
+    '— small but counts.',
+    '— still on track.',
+    '— handled it.',
+    '— easy decision.',
+    '— nothing wasted.',
+    '— adds up.',
+  ];
+
+  // deterministic seeds
+  const prefixSeed = Math.abs(seedInt(`${seed}:prefix`));
+  const actionSeed = Math.abs(seedInt(`${seed}:action:${jarType}`));
+  const amountSeed = Math.abs(seedInt(`${seed}:amount`));
+  const endingSeed = Math.abs(seedInt(`${seed}:ending:${spendMode}`));
+
+  // index selection
+  const prefixIndex = (prefixSeed + weekIndex) % labelPrefixes.length;
+  const amountIndex = (amountSeed + weekIndex * 5) % amountDescriptions.length;
+  const endingIndex = (endingSeed + weekIndex * 7) % sentenceEndings.length;
+
+  const prefix = labelPrefixes[prefixIndex];
+  const amountText = amountDescriptions[amountIndex];
+  const ending = sentenceEndings[endingIndex];
+
+  let actionText = 'spent automatically';
+
+  if (jarType === 'fun') {
+    const index = (actionSeed + weekIndex * 3) % funActions.length;
+    actionText = funActions[index];
+  } else if (jarType === 'learning') {
+    const tier = getLearningTier(amount);
+    const actions = learningActionsByTier[tier];
+    const index = (actionSeed + weekIndex * 3) % actions.length;
+    actionText = actions[index];
+  } else if (jarType === 'give') {
+    const index = (actionSeed + weekIndex * 3) % givingActions.length;
+    actionText = givingActions[index];
+  }
+
+  return `${prefix} ${actionText} — ${amountText} ${ending}`;
 }
 
 /** Seasonal bill increase rules by month index. */
@@ -153,7 +339,7 @@ export function computeBillsFinal(
       return { estimated, actual, delta, reason: seasonal.reason };
     }
 
-    const factor = (r - 0.5) * 0.1;
+    const factor = (r - BILL_VARIANCE_CENTER) * BILL_VARIANCE_RANGE;
     const actual = Math.round(estimated * (1 + factor));
     const delta = actual - estimated;
     return { estimated, actual, delta, reason: null };

@@ -1,4 +1,12 @@
-import type { BudgetSimulationModuleConfig } from '../../budget-simulation.constant';
+import {
+  type BudgetSimulationModuleConfig,
+  NUMBER_OF_WEEKS_PER_MONTH,
+  FUN_SPEND_THRESHOLD_FULL,
+  FUN_SPEND_THRESHOLD_HALF,
+  FUN_BONUS_FULL,
+  FUN_BONUS_HALF,
+  RECOVERY_EFFICIENCY_DIVISOR,
+} from '../../budget-simulation.constant';
 import {
   clampHi,
   clampLqi,
@@ -53,7 +61,6 @@ export interface WeeklyIndexResult {
   weeklyProgress: WeeklyIndexProgressItem;
 }
 
-const NUMBER_OF_WEEKS_PER_MONTH = 4;
 
 /**
  * Returns baseline and fun efficiency (0-100) for a LQI state from config.
@@ -98,9 +105,9 @@ export function resolveWeek(input: WeeklyIndexInput): WeeklyIndexResult {
   );
 
   let funBonusRaw = 0;
-  if (weeklySpend.fun >= 75) funBonusRaw = 1;
-  else if (weeklySpend.fun >= 25) funBonusRaw = 0.5;
-  const weeklyFunRecoveryBonus = Math.round(funBonusRaw * (funPct / 100));
+  if (weeklySpend.fun >= FUN_SPEND_THRESHOLD_FULL) funBonusRaw = FUN_BONUS_FULL;
+  else if (weeklySpend.fun >= FUN_SPEND_THRESHOLD_HALF) funBonusRaw = FUN_BONUS_HALF;
+  const weeklyFunRecoveryBonus = Math.round(funBonusRaw * (funPct / RECOVERY_EFFICIENCY_DIVISOR));
   const stressEffect = 0;
 
   const hiNetChange =

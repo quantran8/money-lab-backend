@@ -16,6 +16,11 @@ import {
 } from '@budget-simulation/budget-simulation.enum';
 import {
   BILL_RESERVE_OPTIONS,
+  DEFAULT_HI_START,
+  DEFAULT_JOB_LEVEL,
+  DEFAULT_JOB_XP,
+  DEFAULT_LQI_START,
+  FIRST_MONTH_INDEX,
   FREE_CASH_CODE,
 } from '@budget-simulation/budget-simulation.constant';
 import { resolveLqiState } from '@budget-simulation/budget-simulation.helpers';
@@ -128,8 +133,8 @@ export class BudgetSimulationRunService {
             {
               userId,
               jobId: BigInt(jobId),
-              level: 1,
-              xp: 0,
+              level: DEFAULT_JOB_LEVEL,
+              xp: DEFAULT_JOB_XP,
               currentMonthlyIncome: income,
               isActive: true,
             },
@@ -164,7 +169,7 @@ export class BudgetSimulationRunService {
             budgetRunId: run.id,
             commitmentTemplateId: BigInt(templateId),
             selectedAmount: amount,
-            effectiveFromMonthIndex: 1,
+            effectiveFromMonthIndex: FIRST_MONTH_INDEX,
             effectiveToMonthIndex: null,
           }),
         );
@@ -194,20 +199,25 @@ export class BudgetSimulationRunService {
   ) {
     return wrapAsync(this.logger, 'startMonth', async () => {
       const runIdBig = BigInt(runId);
-      const run = await this.runQuery.findRunWithJobState(runIdBig);
+      const [run, prevMonth] = await Promise.all([
+        this.runQuery.findRunWithJobState(runIdBig),
+        this.monthQuery.findPreviousMonth(runIdBig),
+      ]);
       if (!run || run.userId !== userId)
         throw new ForbiddenException('Forbidden or Run not found');
 
       const covPct = this.getBillReserveCoveragePctSync(billReserveOptionCode);
 
-      const prevMonth = await this.monthQuery.findPreviousMonth(runIdBig);
       const monthIndex = (prevMonth?.monthIndex ?? 0) + 1;
-      const commitments = await this.runQuery.findActiveCommitmentsForMonth(
-        runIdBig,
-        monthIndex,
-      );
-
       const coreJars = Object.values(JarCode) as string[];
+
+      const [commitments, prevJars] = await Promise.all([
+        this.runQuery.findActiveCommitmentsForMonth(runIdBig, monthIndex),
+        prevMonth
+          ? this.monthQuery.findJarsForMonth(prevMonth.id, coreJars)
+          : Promise.resolve([]),
+      ]);
+
       let prevMonthFreeCashBalance = 0;
       let prevJarBalances: Record<string, number> = {};
       const jarsRefillNeeded = { ...allocations };
@@ -215,10 +225,6 @@ export class BudgetSimulationRunService {
       if (prevMonth) {
         prevMonthFreeCashBalance = Math.max(0, Number(prevMonth.freeCash ?? 0));
 
-        const prevJars = await this.monthQuery.findJarsForMonth(
-          prevMonth.id,
-          coreJars,
-        );
         const allocByJar = Object.fromEntries(
           prevJars.map((j) => [j.jarCode, Number(j.allocatedAmount)]),
         );
@@ -258,11 +264,11 @@ export class BudgetSimulationRunService {
       const hiStart =
         prevMonth?.indexResolution?.hiEnd ??
         prevMonth?.indexResolution?.hiStart ??
-        70;
+        DEFAULT_HI_START;
       const lqiStart =
         prevMonth?.indexResolution?.lqiEnd ??
         prevMonth?.indexResolution?.lqiStart ??
-        70;
+        DEFAULT_LQI_START;
       const stress = prevMonth?.structuralOvercommitmentOccurred ?? false;
       const billReserveStart = prevMonth?.billResolution?.billReserveEnd ?? 0;
 
@@ -319,6 +325,8 @@ export class BudgetSimulationRunService {
       const monthFreeCash = leftToAllocate - allocSum;
 
       const cumulativeFreeCash = prevMonthFreeCashBalance + monthFreeCash;
+      const cumulativeFutureYou =
+        prevMonth?.cumulativeFutureYou ?? allocations[JarCode.futureYou] ?? 0;
 
       if (allocSum > leftToAllocate && cumulativeFreeCash < 0)
         throw new BadRequestException(
@@ -336,7 +344,7 @@ export class BudgetSimulationRunService {
             billsActual: null,
             billReserveOptionCode,
             spendModeCode,
-            cumulativeFutureYou: prevMonth?.cumulativeFutureYou ?? 0,
+            cumulativeFutureYou: cumulativeFutureYou,
             freeCash: cumulativeFreeCash,
             currentWeek: 0,
             stressModeActive: stress,
@@ -394,6 +402,7 @@ export class BudgetSimulationRunService {
           leftToAllocate: leftToAllocate,
           allocatedTotal: allocSum,
           freeCash: cumulativeFreeCash,
+          cumulativeFutureYou: cumulativeFutureYou,
           spendModeCode: spendModeCode,
           stressModeActive: stress,
           hiStart: hiStart,

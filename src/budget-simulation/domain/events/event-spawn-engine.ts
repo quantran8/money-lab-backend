@@ -1,4 +1,9 @@
 import { deterministicRandom } from '../../budget-simulation.helpers';
+import {
+  DEFAULT_SPAWN_PROBABILITY,
+  MAX_SPAWN_PROBABILITY,
+  RARITY_WEIGHT_BASE,
+} from '../../budget-simulation.constant';
 
 export interface EventPoolWeight {
   eventCategory: string;
@@ -14,7 +19,7 @@ export interface EventTemplateRef {
  * Deterministic spawn roll: returns true if an event should spawn (e.g. roll < 0.5).
  */
 export function shouldSpawn(seed: string): boolean {
-  return deterministicRandom(seed) < 0.5;
+  return deterministicRandom(seed) < DEFAULT_SPAWN_PROBABILITY;
 }
 
 /**
@@ -22,7 +27,7 @@ export function shouldSpawn(seed: string): boolean {
  */
 export function shouldSpawnLane(seed: string, probability: number): boolean {
   if (probability <= 0) return false;
-  const p = Math.min(1, probability);
+  const p = Math.min(MAX_SPAWN_PROBABILITY, probability);
   return deterministicRandom(seed) < p;
 }
 
@@ -50,11 +55,11 @@ export function chooseTemplate(
   seed: string,
   templates: EventTemplateRef[],
 ): bigint {
-  const totalWeight = templates.reduce((sum, t) => sum + (11 - t.rarity), 0);
+  const totalWeight = templates.reduce((sum, t) => sum + (RARITY_WEIGHT_BASE - t.rarity), 0);
   const roll = deterministicRandom(seed) * totalWeight;
   let runningWeight = 0;
   for (const t of templates) {
-    runningWeight += 11 - t.rarity;
+    runningWeight += RARITY_WEIGHT_BASE - t.rarity;
     if (runningWeight >= roll) return t.id;
   }
   return templates[templates.length - 1].id;

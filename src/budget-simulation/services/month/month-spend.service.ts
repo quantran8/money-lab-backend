@@ -3,8 +3,9 @@ import { BudgetMonthQuery } from '@budget-simulation/queries/month.query';
 import { BudgetMonthRepository } from '@budget-simulation/repositories/month.repository';
 import { CommitmentQuery } from '@budget-simulation/queries/commitment.query';
 import { JarCode, SpendModeCode } from '@budget-simulation/budget-simulation.enum';
-import type { WeeklySpendSummary } from '@budget-simulation/domain';
+import type { WeeklySpendSummary, WeeklySpendResult } from '@budget-simulation/domain';
 import { buildJarAvailableMap, computeWeeklySpend, jarAvailable } from '@budget-simulation/domain';
+import type { BudgetSimulationModuleConfig } from '@budget-simulation/budget-simulation.constant';
 import { TxClient } from '@app/prisma/transaction.runner';
 
 /**
@@ -85,11 +86,10 @@ export class MonthSpendService {
     }[],
     spendModeRate: number,
     nextWeek: number,
-  ): {
-    entries: { type: string; jar: string; amount: number; jarBalance: number; label: string }[];
-    weeklySpend: WeeklySpendSummary;
-    spendOps: { jarCode: string; amount: number }[];
-  } {
+    playerHI: number,
+    currentJobLevel: number,
+    config: BudgetSimulationModuleConfig,
+  ): WeeklySpendResult {
     const spendModeCode = month.spendModeCode ?? SpendModeCode.normal;
     const jarStates = jars.map((j) => ({
       jarCode: j.jarCode,
@@ -106,19 +106,26 @@ export class MonthSpendService {
       nextWeek,
       budgetRunId: String(month.budgetRunId),
       monthId: String(month.id),
+      playerHI,
+      currentJobLevel,
+      config,
     });
   }
 
   /**
-   * Load month + jars, compute weekly spend, persist via addSpendLog. Returns entries and weeklySpend for response.
+   * Load month + jars, compute weekly spend, persist via addSpendLog. Returns entries, weeklySpend, and learningXpDelta for response.
    */
   async applyWeeklySpend(
     monthId: bigint,
     nextWeek: number,
+    playerHI: number,
+    currentJobLevel: number,
+    config: BudgetSimulationModuleConfig,
     tx?: TxClient,
   ): Promise<{
     entries: { type: string; jar: string; amount: number; jarBalance: number; label: string }[];
     weeklySpend: WeeklySpendSummary;
+    learningXpDelta: number;
   }> {
     const [month, jars] = await Promise.all([
       this.monthQuery.findMonthById(monthId, tx),
@@ -136,11 +143,14 @@ export class MonthSpendService {
       jars,
       rate,
       nextWeek,
+      playerHI,
+      currentJobLevel,
+      config,
     );
     for (const op of result.spendOps) {
       await this.addSpendLog(monthId, op.jarCode, op.amount, 0, 0, tx);
     }
-    return { entries: result.entries, weeklySpend: result.weeklySpend };
+    return { entries: result.entries, weeklySpend: result.weeklySpend, learningXpDelta: result.learningXpDelta };
   }
 
   /**

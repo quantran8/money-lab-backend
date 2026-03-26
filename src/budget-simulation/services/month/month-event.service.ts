@@ -12,6 +12,7 @@ import { JarCode, LqiState } from '@budget-simulation/budget-simulation.enum';
 import {
   BUDGET_SIMULATION_MODULE_ID,
   END_OF_MONTH_WEEK,
+  EVENT_DEDUP_LOOKBACK_MONTHS,
   EVENT_SOURCE_LIFE,
   EVENT_SOURCE_WORK,
   EVENT_SUBTYPE_OVERTIME,
@@ -32,6 +33,7 @@ import { MonthSpendService } from './month-spend.service';
 import { MonthIndexService } from './month-index.service';
 import { MonthBillService } from './month-bill.service';
 import { NextMonthPreviewService } from './next-month-preview.service';
+import { RunAnalyzeService } from '../run/run-analyze.service';
 import type {
   MonthWithRunAndJobLevelAndJars,
   NextMonthPreview,
@@ -64,6 +66,7 @@ export class MonthEventService {
     private readonly indexService: MonthIndexService,
     private readonly billService: MonthBillService,
     private readonly previewService: NextMonthPreviewService,
+    private readonly analyzeService: RunAnalyzeService,
   ) {}
 
   /**
@@ -161,7 +164,7 @@ export class MonthEventService {
       month.indexResolution?.lqiStateEnd ??
       month.indexResolution?.lqiStateStart ??
       LqiState.stable;
-    const fromMonth = Math.max(1, month.monthIndex - 5);
+    const fromMonth = Math.max(1, month.monthIndex - EVENT_DEDUP_LOOKBACK_MONTHS);
 
     const [usedIds, weightsRows] = await Promise.all([
       moduleId === BUDGET_SIMULATION_MODULE_ID
@@ -367,12 +370,7 @@ export class MonthEventService {
       week,
       tx,
     );
-    const templateRow = await this.monthQuery.findPendingEventWithTemplateById(
-      event.id,
-      tx,
-    );
-    if (!templateRow) return null;
-    return this.buildSpawnPayload(fullMonth, templateRow);
+    return this.buildSpawnPayload(fullMonth, event);
   }
 
   /**
@@ -764,6 +762,7 @@ export class MonthEventService {
 
     let nextMonthPreview: NextMonthPreview | undefined;
     let runComplete = false;
+    let runAnalysis: Awaited<ReturnType<RunAnalyzeService['analyzeRun']>> | undefined;
 
     if (txResult.monthComplete) {
       if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
@@ -773,6 +772,7 @@ export class MonthEventService {
           passed: txResult.futureYouTotal > 0,
         });
         runComplete = true;
+        runAnalysis = await this.analyzeService.analyzeRun(Number(month.budgetRunId));
       } else {
         nextMonthPreview = await this.previewService.computePreview(month);
       }
@@ -792,6 +792,7 @@ export class MonthEventService {
       lqiAfter,
       monthComplete: txResult.monthComplete,
       runComplete,
+      runAnalysis,
       bills: txResult.bills,
       futureYouTotal: txResult.futureYouTotal,
       futureRemainInMonth,

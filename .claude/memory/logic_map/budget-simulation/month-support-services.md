@@ -12,9 +12,9 @@ type: reference
 - `getSpendModeRate(code)` → enjoy=1.0, normal=0.85, save=0.7
 - `getJarAvailable(monthId, jarCode, tx?)` → jar balance from DB (0 if not found)
 - `addSpendLog(monthId, jarCode, spent, overflowIn, overflowOut, tx?)` → increment jar fields
-- `computeWeeklySpend(month, jars, spendModeRate, nextWeek)` → **pure** (delegates to domain)
-  - Returns: `{entries[], weeklySpend{fun,learning,give}, spendOps[]}`
-- `applyWeeklySpend(monthId, nextWeek, tx?)` → loads month+jars, computes, persists all spend ops
+- `computeWeeklySpend(month, jars, spendModeRate, nextWeek, playerHI, currentJobLevel, config)` → **pure** (delegates to domain)
+  - Returns: `{entries[], weeklySpend{fun,learning,give}, spendOps[], learningXpDelta}`
+- `applyWeeklySpend(monthId, nextWeek, playerHI, currentJobLevel, config, tx?)` → loads month+jars, computes, persists all spend ops
 - `jarAvailableFromLoaded(month, jars, jarCode)` → **pure** (from preloaded state)
 
 ---

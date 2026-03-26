@@ -23,10 +23,10 @@ export const RUN_MONTH_INDEX_COMPLETE = 6;
 export const END_OF_MONTH_WEEK = NUMBER_OF_WEEKS_PER_MONTH;
 
 export const BILL_RESERVE_OPTIONS = [
-  { code: 'none', coveragePct: 0, label: '0%' },
-  { code: 'half', coveragePct: 50, label: '50%' },
-  { code: 'high', coveragePct: 75, label: '75%' },
-  { code: 'full', coveragePct: 100, label: '100%' },
+  { code: 'none', coveragePct: 0, label: 'None' },
+  { code: 'half', coveragePct: 50, label: 'Half' },
+  { code: 'high', coveragePct: 75, label: 'High' },
+  { code: 'full', coveragePct: 100, label: 'Full' },
 ] as const;
 
 /** Returns bill reserve coverage percentage for a given option code. */
@@ -44,6 +44,82 @@ export const SPEND_MODE_OPTIONS = [
 ] as const;
 
 export const FREE_CASH_CODE = 'free_cash';
+
+// --- Game Defaults ---
+
+/** Default HI/LQI value when no prior index data exists. */
+export const DEFAULT_HI_START = 60;
+export const DEFAULT_LQI_START = 60;
+
+/** Fallback HI/LQI value when index resolution exists but fields are null. */
+export const DEFAULT_HI_FALLBACK = 50;
+
+/** Default job level for new job states. */
+export const DEFAULT_JOB_LEVEL = 1;
+
+/** Default XP for new job states. */
+export const DEFAULT_JOB_XP = 0;
+
+/** First month index when starting a new run. */
+export const FIRST_MONTH_INDEX = 1;
+
+// --- Forced Rest ---
+
+/** HI recovery amount when forced rest is triggered. */
+export const FORCED_REST_HI_RECOVERY = 5;
+
+// --- Index Calculator ---
+
+/** Fun spend threshold for full recovery bonus (>= this → full bonus). */
+export const FUN_SPEND_THRESHOLD_FULL = 75;
+
+/** Fun spend threshold for half recovery bonus (>= this → half bonus). */
+export const FUN_SPEND_THRESHOLD_HALF = 25;
+
+/** Full fun recovery bonus multiplier. */
+export const FUN_BONUS_FULL = 1;
+
+/** Half fun recovery bonus multiplier. */
+export const FUN_BONUS_HALF = 0.5;
+
+/** Percentage divisor for recovery efficiency. */
+export const RECOVERY_EFFICIENCY_DIVISOR = 100;
+
+// --- HI Efficiency Thresholds (Learning XP) ---
+
+/** HI threshold for high efficiency (>= this → high). */
+export const HI_EFFICIENCY_HIGH_THRESHOLD = 70;
+
+/** HI threshold for mid efficiency (>= this → mid). */
+export const HI_EFFICIENCY_MID_THRESHOLD = 40;
+
+// --- Event Spawn ---
+
+/** Default spawn probability for shouldSpawn(). */
+export const DEFAULT_SPAWN_PROBABILITY = 0.5;
+
+/** Max spawn probability clamp. */
+export const MAX_SPAWN_PROBABILITY = 1;
+
+/** Base rarity weight for event template selection (weight = this - rarity). */
+export const RARITY_WEIGHT_BASE = 11;
+
+/** Number of months to look back for event deduplication. */
+export const EVENT_DEDUP_LOOKBACK_MONTHS = 5;
+
+// --- Bill Variance ---
+
+/** Normal month bill variance center offset. */
+export const BILL_VARIANCE_CENTER = 0.5;
+
+/** Normal month bill variance range. */
+export const BILL_VARIANCE_RANGE = 0.1;
+
+// --- Learning Tier Thresholds (for auto-spend labels) ---
+
+export const LEARNING_TIER_MICRO_MAX = 30;
+export const LEARNING_TIER_BASIC_MAX = 100;
+export const LEARNING_TIER_COURSE_MAX = 200;
 
 /** Shape of module.config for budget-simulation (camelCase). */
 export interface BudgetSimulationModuleConfig {
@@ -67,6 +143,24 @@ export interface BudgetSimulationModuleConfig {
       stable: { fun: number; baseline: number };
       strained: { fun: number; baseline: number };
       compressed: { fun: number; baseline: number };
+    };
+  };
+  progressionSystem: {
+    jobLevels: {
+      levels: Array<{
+        level: number;
+        learningCapModifier: number;
+      }>;
+    };
+    learningXp: {
+      xpRate: number;
+      baseCap: number;
+      hiEfficiency: {
+        low: number;
+        mid: number;
+        high: number;
+      };
+      reducedXpRate: number;
     };
   };
 }
@@ -94,6 +188,21 @@ export const DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG: BudgetSimulationModuleConf
         stable: { fun: 100, baseline: 100 },
         strained: { fun: 70, baseline: 80 },
         compressed: { fun: 85, baseline: 90 },
+      },
+    },
+    progressionSystem: {
+      jobLevels: {
+        levels: [
+          { level: 1, learningCapModifier: 1 },
+          { level: 2, learningCapModifier: 1.05 },
+          { level: 3, learningCapModifier: 1.1 },
+        ],
+      },
+      learningXp: {
+        xpRate: 0.8,
+        baseCap: 100,
+        hiEfficiency: { low: 0.75, mid: 0.9, high: 1 },
+        reducedXpRate: 0.3,
       },
     },
   };
@@ -136,6 +245,28 @@ export function getBudgetSimulationModuleConfig(
           ...DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.indexRules
             ?.recoveryEfficiencyPct?.compressed,
           ...mapped.indexRules?.recoveryEfficiencyPct?.compressed,
+        },
+      },
+    },
+    progressionSystem: {
+      ...DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.progressionSystem,
+      ...mapped.progressionSystem,
+      jobLevels: {
+        ...DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.progressionSystem?.jobLevels,
+        ...mapped.progressionSystem?.jobLevels,
+        levels:
+          mapped.progressionSystem?.jobLevels?.levels ??
+          DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.progressionSystem.jobLevels
+            .levels,
+      },
+      learningXp: {
+        ...DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.progressionSystem
+          ?.learningXp,
+        ...mapped.progressionSystem?.learningXp,
+        hiEfficiency: {
+          ...DEFAULT_BUDGET_SIMULATION_MODULE_CONFIG.progressionSystem
+            ?.learningXp?.hiEfficiency,
+          ...mapped.progressionSystem?.learningXp?.hiEfficiency,
         },
       },
     },
