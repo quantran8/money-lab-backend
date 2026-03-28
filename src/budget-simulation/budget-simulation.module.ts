@@ -14,11 +14,11 @@ import { MonthSpendService } from './services/month/month-spend.service';
 import { MonthIndexService } from './services/month/month-index.service';
 import { MonthBillService } from './services/month/month-bill.service';
 import { NextMonthPreviewService } from './services/month/next-month-preview.service';
-import { BudgetRunQuery } from './queries/run.query';
+import { RunQuery } from './queries/run.query';
 import { BudgetMonthQuery } from './queries/month.query';
 import { CommitmentQuery } from './queries/commitment.query';
 import { ModuleQuery } from './queries/module.query';
-import { BudgetRunRepository } from './repositories/run.repository';
+import { RunRepository } from './repositories/run.repository';
 import { BudgetMonthRepository } from './repositories/month.repository';
 import { TransactionRunner } from '#app/prisma/transaction.runner.js';
 
@@ -29,10 +29,10 @@ import { TransactionRunner } from '#app/prisma/transaction.runner.js';
     TransactionRunner,
     ModuleQuery,
     BudgetSimulationConfigService,
-    BudgetRunQuery,
+    RunQuery,
     BudgetMonthQuery,
     CommitmentQuery,
-    BudgetRunRepository,
+    RunRepository,
     BudgetMonthRepository,
     BudgetSimulationSetupService,
     BudgetSimulationRunService,

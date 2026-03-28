@@ -8,7 +8,7 @@ import { InvestArcService } from './arc.service.js';
 import { InvestPolicyService } from './policy.service.js';
 import { InvestNewsService } from './news.service.js';
 import { InvestPricingService } from './pricing.service.js';
-import { InvestBehaviorWindowService } from './behavior-window.service.js';
+import { BehaviorWindowService } from './behavior-window.service.js';
 import { InvestBehaviorEvaluationService } from './behavior-evaluation.service.js';
 import type { StateTransitionEvent } from '../domain/index.js';
 
@@ -25,7 +25,7 @@ export class InvestTickService {
     private readonly policyService: InvestPolicyService,
     private readonly newsService: InvestNewsService,
     private readonly pricingService: InvestPricingService,
-    private readonly behaviorWindowService: InvestBehaviorWindowService,
+    private readonly behaviorWindowService: BehaviorWindowService,
     private readonly behaviorEvalService: InvestBehaviorEvaluationService,
   ) {}
 
@@ -46,10 +46,10 @@ export class InvestTickService {
     return wrapAsync(this.logger, 'runTick', async () => {
       // 1. Determine next tick index
       const currentTick = await this.marketQuery.findCurrentTick();
-      const nextTickIndex = (currentTick?.tickIndex ?? 0) + 1;
+      const nextTickIndex = (currentTick?.tickIndex ?? 0n) + 1n;
 
       // Simple sim calendar: 1 tick = 1 day, 30 days/month, 12 months/year
-      const totalDays = nextTickIndex;
+      const totalDays = Number(nextTickIndex);
       const simYear = Math.floor(totalDays / 360) + 1;
       const dayOfYear = totalDays % 360;
       const simMonth = Math.floor(dayOfYear / 30) + 1;
@@ -120,7 +120,7 @@ export class InvestTickService {
           {
             tickId: tick.id,
             stateData: {
-              tickIndex: nextTickIndex,
+              tickIndex: Number(nextTickIndex),
               simDay,
               simMonth,
               simYear,
@@ -136,7 +136,7 @@ export class InvestTickService {
         );
 
         return {
-          tickIndex: nextTickIndex,
+          tickIndex: Number(nextTickIndex),
           simDay,
           simMonth,
           simYear,

@@ -8,12 +8,13 @@ import { TransactionRunner } from '#app/prisma/transaction.runner.js';
 import { wrapAsync } from '#common/utils/async.utils.js';
 import { InvestMarketQuery } from '../queries/market.query.js';
 import { InvestPortfolioQuery } from '../queries/portfolio.query.js';
-import { InvestAssetQuery } from '../queries/asset.query.js';
+import { AssetQuery } from '../queries/asset.query.js';
 import { InvestPortfolioRepository } from '../repositories/portfolio.repository.js';
 import {
   computeBuyFill,
   computeSellFill,
   computeNewAvgPrice,
+  allowsFractionalQuantity,
 } from '../domain/index.js';
 import { OrderSide } from '../invest-simulation.enum.js';
 import { DEFAULT_STARTING_CREDITS } from '../invest-simulation.constant.js';
@@ -26,7 +27,7 @@ export class InvestTradeService {
     private readonly transactionRunner: TransactionRunner,
     private readonly marketQuery: InvestMarketQuery,
     private readonly portfolioQuery: InvestPortfolioQuery,
-    private readonly assetQuery: InvestAssetQuery,
+    private readonly assetQuery: AssetQuery,
     private readonly portfolioRepo: InvestPortfolioRepository,
   ) {}
 
@@ -41,13 +42,23 @@ export class InvestTradeService {
       if (!asset) throw new NotFoundException('Asset not found');
       if (!tick) throw new NotFoundException('No market ticks available');
 
+      if (
+        !allowsFractionalQuantity(asset.assetType) &&
+        !Number.isInteger(quantity)
+      ) {
+        throw new BadRequestException(
+          'Fractional quantities are only allowed for crypto assets',
+        );
+      }
+
       const [credit, pricePoint, position] = await Promise.all([
         this.portfolioQuery.findUserCredit(userId),
         this.marketQuery.findLatestPriceForAsset(assetId, tick.id),
         this.portfolioQuery.findPosition(userId, assetId),
       ]);
 
-      if (!pricePoint) throw new NotFoundException('No price available for this asset');
+      if (!pricePoint)
+        throw new NotFoundException('No price available for this asset');
 
       const balance = credit?.balance ?? 0;
 
@@ -73,7 +84,11 @@ export class InvestTradeService {
       const result = await this.transactionRunner.run(async (tx) => {
         // Ensure credit row exists
         if (!credit) {
-          await this.portfolioRepo.ensureUserCredit(userId, DEFAULT_STARTING_CREDITS, tx);
+          await this.portfolioRepo.ensureUserCredit(
+            userId,
+            DEFAULT_STARTING_CREDITS,
+            tx,
+          );
           // Re-validate after creation
           const newBalance = DEFAULT_STARTING_CREDITS;
           if (fill.totalCost > newBalance) {
@@ -88,7 +103,9 @@ export class InvestTradeService {
           tx,
         );
         if (affected === 0) {
-          throw new BadRequestException('Insufficient credits (concurrent update)');
+          throw new BadRequestException(
+            'Insufficient credits (concurrent update)',
+          );
         }
 
         // Upsert position
@@ -131,16 +148,32 @@ export class InvestTradeService {
   async executeSell(userId: string, assetId: bigint, quantity: number) {
     return wrapAsync(this.logger, 'executeSell', async () => {
       // 1. LOAD (parallel)
-      const [tick, position] = await Promise.all([
+      const [asset, tick, position] = await Promise.all([
+        this.assetQuery.findById(assetId),
         this.marketQuery.findCurrentTick(),
         this.portfolioQuery.findPosition(userId, assetId),
       ]);
 
+      if (!asset) throw new NotFoundException('Asset not found');
       if (!tick) throw new NotFoundException('No market ticks available');
-      if (!position) throw new BadRequestException('No position held for this asset');
+      if (!position)
+        throw new BadRequestException('No position held for this asset');
 
-      const pricePoint = await this.marketQuery.findLatestPriceForAsset(assetId, tick.id);
-      if (!pricePoint) throw new NotFoundException('No price available for this asset');
+      if (
+        !allowsFractionalQuantity(asset.assetType) &&
+        !Number.isInteger(quantity)
+      ) {
+        throw new BadRequestException(
+          'Fractional quantities are only allowed for crypto assets',
+        );
+      }
+
+      const pricePoint = await this.marketQuery.findLatestPriceForAsset(
+        assetId,
+        tick.id,
+      );
+      if (!pricePoint)
+        throw new NotFoundException('No price available for this asset');
 
       // 2. COMPUTE (pure domain)
       const fill = computeSellFill({
@@ -159,7 +192,12 @@ export class InvestTradeService {
         await this.portfolioRepo.addCredits(userId, fill.totalProceeds, tx);
 
         // Decrease position
-        await this.portfolioRepo.decreasePosition(userId, assetId, quantity, tx);
+        await this.portfolioRepo.decreasePosition(
+          userId,
+          assetId,
+          quantity,
+          tx,
+        );
 
         // Remove position if quantity reaches zero
         await this.portfolioRepo.deletePositionIfEmpty(userId, assetId, tx);

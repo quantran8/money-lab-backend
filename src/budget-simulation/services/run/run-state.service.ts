@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
+import { RunQuery } from '#budget-simulation/queries/run.query.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import {
   FREE_CASH_CODE,
@@ -66,11 +66,11 @@ function buildJarsMap(
 }
 
 function mapPendingEventToPayload(
-  e: { id: bigint; eventSource: string; eventSubtype: string | null; template: { id: bigint; title: string; description: string | null; options: Array<{ id: bigint; optionLabel: string; description: string | null; moneyJarCode: string | null; moneyDelta: number; healthDelta: number; lqiDelta: number; learningXpDelta: number }> } },
+  e: { id: bigint; eventSource: string | null; eventSubtype: string | null; template: { id: bigint; title: string; description: string | null; options: Array<{ id: bigint; optionLabel: string; description: string | null; moneyJarCode: string | null; moneyDelta: number; healthDelta: number; lqiDelta: number; learningXpDelta: number }> } },
 ): SpawnEventTemplatePayload {
   return {
     eventId: e.id.toString(),
-    eventSource: e.eventSource,
+    eventSource: e.eventSource ?? 'life',
     eventSubtype: e.eventSubtype,
     templateId: e.template.id.toString(),
     title: e.template.title,
@@ -95,14 +95,14 @@ export class BudgetSimulationRunStateService {
   private readonly logger = new Logger(BudgetSimulationRunStateService.name);
 
   constructor(
-    private readonly runQuery: BudgetRunQuery,
+    private readonly runQuery: RunQuery,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly configService: BudgetSimulationConfigService,
     private readonly previewService: NextMonthPreviewService,
   ) {}
 
-  async getActiveBudgetRun(userId: string) {
-    return wrapAsync(this.logger, 'getActiveBudgetRun', async () => {
+  async getActiveRun(userId: string) {
+    return wrapAsync(this.logger, 'getActiveRun', async () => {
       const run = await this.runQuery.findActiveRunWithDetails(userId);
       if (!run) return null;
 
@@ -201,7 +201,7 @@ export class BudgetSimulationRunStateService {
     if (monthResolved && latestMonth) {
       const fullMonth: MonthWithRunAndJobLevelAndJars = {
         ...latestMonth,
-        budgetRun: { ...run, jobState: run.jobState! },
+        run: { ...run, jobState: run.jobState! },
       } as MonthWithRunAndJobLevelAndJars;
       const preview = await this.previewService.computePreview(fullMonth);
       return [preview, undefined];

@@ -70,7 +70,7 @@ export class InvestStabilityScoreService {
    * Recalculate stability and score for a single user.
    * Called from the evaluate-users internal endpoint.
    */
-  async recalculateForUser(userId: string, tickIndex: number): Promise<void> {
+  async recalculateForUser(userId: string, tickIndex: bigint): Promise<void> {
     await this.transactionRunner.run(async (tx) => {
       // 1. Load behavior snapshots
       const snapshots = await this.behaviorQuery.findSnapshotsByUser(userId, 5);
@@ -179,9 +179,9 @@ export class InvestStabilityScoreService {
   /**
    * Evaluate all users who have credits (i.e., active users).
    */
-  async evaluateAllUsers(tickIndex: number): Promise<number> {
+  async evaluateAllUsers(tickIndex: bigint): Promise<number> {
     return wrapAsync(this.logger, 'evaluateAllUsers', async () => {
-      const users = await this.prisma.investUserCredit.findMany({
+      const users = await this.prisma.userCredit.findMany({
         select: { userId: true },
       });
 

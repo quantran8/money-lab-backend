@@ -12,10 +12,10 @@ export class InvestPolicyRepository {
   }
 
   async createInstance(
-    data: Prisma.InvestPolicyThreadInstanceUncheckedCreateInput,
+    data: Prisma.PolicyThreadInstanceUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investPolicyThreadInstance.create({ data });
+    return this.client(tx).policyThreadInstance.create({ data });
   }
 
   async updateInstanceState(
@@ -25,14 +25,14 @@ export class InvestPolicyRepository {
     actionsCompleted: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investPolicyThreadInstance.update({
+    return this.client(tx).policyThreadInstance.update({
       where: { id },
       data: { state, ticksInCurrentState, actionsCompleted },
     });
   }
 
-  async deactivateInstance(id: bigint, resolvedAtTick: number, tx?: TxClient) {
-    return this.client(tx).investPolicyThreadInstance.update({
+  async deactivateInstance(id: bigint, resolvedAtTick: bigint, tx?: TxClient) {
+    return this.client(tx).policyThreadInstance.update({
       where: { id },
       data: { isActive: false, resolvedAtTick },
     });

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
+import { RunQuery } from '#budget-simulation/queries/run.query.js';
 import {
   analyzeRun,
   type AnalyzeMonthInput,
@@ -18,7 +18,7 @@ type MonthRow = RunWithAllMonthsRow['months'][number];
 export class RunAnalyzeService {
   private readonly logger = new Logger(RunAnalyzeService.name);
 
-  constructor(private readonly runQuery: BudgetRunQuery) {}
+  constructor(private readonly runQuery: RunQuery) {}
 
   async analyzeRun(runId: number): Promise<RunAnalysisResult> {
     return wrapAsync(this.logger, 'analyzeRun', async () => {
@@ -46,22 +46,22 @@ export class RunAnalyzeService {
           })),
           indexResolution: m.indexResolution
             ? {
-                hiStart: m.indexResolution.hiStart,
+                hiStart: m.indexResolution.hiStart ?? 0,
                 hiEnd: m.indexResolution.hiEnd ?? null,
-                lqiStart: m.indexResolution.lqiStart,
+                lqiStart: m.indexResolution.lqiStart ?? 0,
                 lqiEnd: m.indexResolution.lqiEnd ?? null,
                 lqiStateEnd: m.indexResolution.lqiStateEnd ?? null,
               }
             : null,
           billResolution: m.billResolution
             ? {
-                shortfallTotal: m.billResolution.shortfallTotal,
-                surplusToFreeCash: m.billResolution.surplusToFreeCash,
-                billReserveEnd: m.billResolution.billReserveEnd,
+                shortfallTotal: m.billResolution.shortfallTotal ?? 0,
+                surplusToFreeCash: m.billResolution.surplusToFreeCash ?? 0,
+                billReserveEnd: m.billResolution.billReserveEnd ?? 0,
               }
             : null,
           events: m.events.map((e) => ({
-            eventSource: e.eventSource,
+            eventSource: e.eventSource ?? 'life',
             eventSubtype: e.eventSubtype,
             chosenOptionId: e.chosenOptionId,
             option: e.option

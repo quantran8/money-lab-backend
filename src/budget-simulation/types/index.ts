@@ -6,7 +6,7 @@ export type {
   MonthWithJars,
   MonthWithRunAndJars,
   MonthWithRunAndModule,
-  PendingBudgetMonthEventRow,
+  PendingMonthEventRow,
   PendingEventWithTemplateRow,
   ChosenEventsTotalsResult,
   ForcedRestNotice,
@@ -18,7 +18,7 @@ export type {
 export type {
   LifeEventTemplateRow,
   LifeEventTemplateWithOptionsRow,
-  ModuleEventPoolWeightRow,
+  EventPoolWeightRow,
   LifeEventOptionRow,
   SpawnEventOptionPayload,
   SpawnEventTemplatePayload,
@@ -33,4 +33,4 @@ export type {
   UserJobStateLatestRow,
   UserRunCommitmentWithTemplateRow,
 } from './run.types';
-export type { BudgetMonthJarRow } from './jar.types';
+export type { MonthJarRow } from './jar.types';

@@ -23,7 +23,7 @@ export class InvestArcService {
    * Advance all active arc instances by one tick.
    * Returns transition events and a global market impact value.
    */
-  async advanceAll(tickIndex: number, tx: TxClient): Promise<{
+  async advanceAll(tickIndex: bigint, tx: TxClient): Promise<{
     events: ArcTransitionEvent[];
     globalImpact: number;
   }> {

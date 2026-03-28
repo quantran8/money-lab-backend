@@ -12,9 +12,9 @@ export class InvestReportRepository {
   }
 
   async createReport(
-    data: Prisma.InvestSimReportUncheckedCreateInput,
+    data: Prisma.SimReportUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investSimReport.create({ data });
+    return this.client(tx).simReport.create({ data });
   }
 }

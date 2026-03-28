@@ -6,8 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
-import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { RunQuery } from '#budget-simulation/queries/run.query.js';
+import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import {
@@ -46,8 +46,8 @@ export class BudgetSimulationRunService {
 
   constructor(
     private readonly transactionRunner: TransactionRunner,
-    private readonly runQuery: BudgetRunQuery,
-    private readonly runRepository: BudgetRunRepository,
+    private readonly runQuery: RunQuery,
+    private readonly runRepository: RunRepository,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
     private readonly configService: BudgetSimulationConfigService,
@@ -105,17 +105,17 @@ export class BudgetSimulationRunService {
     ]);
   }
 
-  async getActiveBudgetRun(userId: string) {
-    return this.runState.getActiveBudgetRun(userId);
+  async getActiveRun(userId: string) {
+    return this.runState.getActiveRun(userId);
   }
 
-  async startBudgetRun(
+  async startRun(
     userId: string,
     moduleId: number,
     jobId: number,
     commitmentAmounts: Record<number, number>,
   ) {
-    return wrapAsync(this.logger, 'startBudgetRun', async () => {
+    return wrapAsync(this.logger, 'startRun', async () => {
       const jobIdBig = BigInt(jobId);
       const [job, jobState] = await Promise.all([
         this.runQuery.findJobWithLevel1(jobIdBig),
@@ -166,7 +166,7 @@ export class BudgetSimulationRunService {
 
         const commitments = Object.entries(commitmentAmounts).map(
           ([templateId, amount]) => ({
-            budgetRunId: run.id,
+            runId: run.id,
             commitmentTemplateId: BigInt(templateId),
             selectedAmount: amount,
             effectiveFromMonthIndex: FIRST_MONTH_INDEX,
@@ -336,7 +336,7 @@ export class BudgetSimulationRunService {
       const result = await this.transactionRunner.run(async (tx) => {
         const month = await this.monthRepository.createMonth(
           {
-            budgetRunId: BigInt(runId),
+            runId: BigInt(runId),
             monthIndex,
             income,
             lockedCommitmentsTotal: lockedTotal,
@@ -354,7 +354,7 @@ export class BudgetSimulationRunService {
 
         await this.monthRepository.createBillResolution(
           {
-            budgetMonthId: month.id,
+            monthId: month.id,
             billReserveTarget,
             billReserveStart,
             billReserveEnd,
@@ -365,7 +365,7 @@ export class BudgetSimulationRunService {
         const lqiStateStart = resolveLqiState(lqiStart, config);
         await this.monthRepository.createIndexResolution(
           {
-            budgetMonthId: month.id,
+            monthId: month.id,
             hiStart,
             hiEnd: hiStart,
             lqiStart,

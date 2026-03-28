@@ -12,25 +12,25 @@ export class InvestNewsRepository {
   }
 
   async createNewsItem(
-    data: Prisma.InvestSimNewsItemUncheckedCreateInput,
+    data: Prisma.SimNewsItemUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investSimNewsItem.create({ data });
+    return this.client(tx).simNewsItem.create({ data });
   }
 
   async createAssetImpacts(
-    data: Prisma.InvestSimNewsAssetImpactCreateManyInput[],
+    data: Prisma.SimNewsAssetImpactCreateManyInput[],
     tx?: TxClient,
   ) {
     if (data.length === 0) return;
-    return this.client(tx).investSimNewsAssetImpact.createMany({ data });
+    return this.client(tx).simNewsAssetImpact.createMany({ data });
   }
 
   async createSectorImpacts(
-    data: Prisma.InvestSimNewsSectorImpactCreateManyInput[],
+    data: Prisma.SimNewsSectorImpactCreateManyInput[],
     tx?: TxClient,
   ) {
     if (data.length === 0) return;
-    return this.client(tx).investSimNewsSectorImpact.createMany({ data });
+    return this.client(tx).simNewsSectorImpact.createMany({ data });
   }
 }

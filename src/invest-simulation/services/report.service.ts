@@ -34,7 +34,7 @@ export class InvestReportService {
       if (!report) throw new NotFoundException('No reports available');
       return {
         id: report.id.toString(),
-        tickIndex: report.tickIndex,
+        tickIndex: Number(report.tickIndex),
         simDay: report.simDay,
         simMonth: report.simMonth,
         simYear: report.simYear,
@@ -51,7 +51,7 @@ export class InvestReportService {
   /**
    * Generate a report for a user at the current tick.
    */
-  async generateForUser(userId: string, tickIndex: number, simDay: number, simMonth: number, simYear: number): Promise<void> {
+  async generateForUser(userId: string, tickIndex: bigint, simDay: number, simMonth: number, simYear: number): Promise<void> {
     const [positions, tick, stability, reflections] = await Promise.all([
       this.portfolioQuery.findPositionsWithAsset(userId),
       this.marketQuery.findCurrentTick(),

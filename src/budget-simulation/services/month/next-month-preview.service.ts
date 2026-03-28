@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BudgetRunQuery } from '#budget-simulation/queries/run.query.js';
+import { RunQuery } from '#budget-simulation/queries/run.query.js';
 import {
   BillReserveOptionCode,
   CommitmentLayer,
@@ -14,7 +14,7 @@ import type { NextMonthPreview } from '#budget-simulation/types/month.types.js';
 @Injectable()
 export class NextMonthPreviewService {
   constructor(
-    private readonly runQuery: BudgetRunQuery,
+    private readonly runQuery: RunQuery,
     private readonly configService: BudgetSimulationConfigService,
   ) {}
 
@@ -22,7 +22,7 @@ export class NextMonthPreviewService {
     month: MonthWithRunAndJobLevelAndJars,
   ): Promise<NextMonthPreview> {
     const nextMonthIndex = month.monthIndex + 1;
-    const runIdBig = month.budgetRunId;
+    const runIdBig = month.runId;
 
     const nextMonthCommitments =
       await this.runQuery.findActiveCommitmentsForMonth(
@@ -30,7 +30,7 @@ export class NextMonthPreviewService {
         nextMonthIndex,
       );
 
-    const jobState = month.budgetRun.jobState;
+    const jobState = month.run.jobState;
     const currentLevel =
       jobState.job.levels.find((l) => l.level === jobState.level) ||
       jobState.job.levels[0];

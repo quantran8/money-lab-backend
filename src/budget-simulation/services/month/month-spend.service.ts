@@ -73,7 +73,7 @@ export class MonthSpendService {
   computeWeeklySpend(
     month: {
       id: bigint;
-      budgetRunId: bigint;
+      runId: bigint;
       monthIndex: number;
       spendModeCode?: string | null;
     },
@@ -104,7 +104,7 @@ export class MonthSpendService {
       spendModeCode,
       monthIndex: month.monthIndex,
       nextWeek,
-      budgetRunId: String(month.budgetRunId),
+      runId: String(month.runId),
       monthId: String(month.id),
       playerHI,
       currentJobLevel,
@@ -139,7 +139,7 @@ export class MonthSpendService {
     const spendModeCode = month.spendModeCode ?? SpendModeCode.normal;
     const rate = await this.getSpendModeRate(spendModeCode);
     const result = this.computeWeeklySpend(
-      { ...month, budgetRunId: month.budgetRunId!, id: month.id },
+      { ...month, runId: month.runId!, id: month.id },
       jars,
       rate,
       nextWeek,

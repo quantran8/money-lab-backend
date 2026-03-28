@@ -7,7 +7,7 @@ export class InvestPolicyQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findActiveInstances(): Promise<PolicyInstanceWithTemplateRow[]> {
-    return this.prisma.investPolicyThreadInstance.findMany({
+    return this.prisma.policyThreadInstance.findMany({
       where: { isActive: true },
       include: { template: true },
       orderBy: { id: 'asc' },

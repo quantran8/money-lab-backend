@@ -30,11 +30,32 @@ export class InvestController {
     return this.investService.getMarketPrices();
   }
 
+  // ── Sectors ─────────────────────────────────────────────────────
+
+  @Get('sectors')
+  getSectors() {
+    return this.investService.getSectors();
+  }
+
+
+
   // ── Assets ───────────────────────────────────────────────────────
 
   @Get('assets')
-  getAssets() {
-    return this.investService.getAssets();
+  getAssets(
+    @Query('sectorId') sectorId?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.investService.getAssets(
+      {
+        sectorId: sectorId ? parseInt(sectorId, 10) : undefined,
+        search: search || undefined,
+      },
+      limit ? parseInt(limit, 10) : undefined,
+      offset ? parseInt(offset, 10) : undefined,
+    );
   }
 
   @Get('assets/:id')

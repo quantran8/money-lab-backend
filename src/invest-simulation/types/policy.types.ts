@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
 
-export type PolicyTemplateRow = Prisma.InvestPolicyThreadTemplateGetPayload<Record<string, never>>;
+export type PolicyTemplateRow = Prisma.PolicyThreadTemplateGetPayload<Record<string, never>>;
 
-export type PolicyInstanceRow = Prisma.InvestPolicyThreadInstanceGetPayload<Record<string, never>>;
+export type PolicyInstanceRow = Prisma.PolicyThreadInstanceGetPayload<Record<string, never>>;
 
-export type PolicyInstanceWithTemplateRow = Prisma.InvestPolicyThreadInstanceGetPayload<{
+export type PolicyInstanceWithTemplateRow = Prisma.PolicyThreadInstanceGetPayload<{
   include: { template: true };
 }>;

@@ -44,7 +44,7 @@ export class MonthBillService {
   ): Promise<Record<string, number | string | null>> {
     const monthIdBig = BigInt(monthId);
     const { jars, month } = context;
-    if (month.budgetRun.userId !== userId)
+    if (month.run.userId !== userId)
       throw new ForbiddenException('Forbidden');
     const weekToCheck = effectiveCurrentWeek ?? month.currentWeek;
     if (weekToCheck < END_OF_MONTH_WEEK)
@@ -59,7 +59,7 @@ export class MonthBillService {
       overflowOut: Number(j.overflowOutAmount),
     }));
     const result = billsReconcile({
-      runId: Number(month.budgetRunId),
+      runId: Number(month.runId),
       monthIndex: month.monthIndex,
       billsEstimated: Number(month.billsEstimated),
       billReserveEnd,
@@ -132,7 +132,7 @@ export class MonthBillService {
   ): Promise<Record<string, number | string | null>> {
     const monthIdBig = BigInt(monthId);
     const month = await this.monthQuery.findMonthWithRun(monthIdBig, tx);
-    if (!month || month.budgetRun.userId !== userId)
+    if (!month || month.run.userId !== userId)
       throw new ForbiddenException('Forbidden');
     const jars = await this.monthQuery.findJarsForMonth(
       monthIdBig,

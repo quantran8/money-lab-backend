@@ -6,7 +6,7 @@ export type JobWithLevel1Row = Prisma.JobGetPayload<{
   include: { levels: { where: { level: number } } };
 }>;
 
-export type ActiveRunWithDetailsRow = Prisma.BudgetRunGetPayload<{
+export type ActiveRunWithDetailsRow = Prisma.RunGetPayload<{
   include: {
     jobState: {
       include: {
@@ -27,13 +27,13 @@ export type ActiveRunWithDetailsRow = Prisma.BudgetRunGetPayload<{
   };
 }>;
 
-export type RunWithJobStateRow = Prisma.BudgetRunGetPayload<{
+export type RunWithJobStateRow = Prisma.RunGetPayload<{
   include: {
     jobState: { include: { job: { include: { levels: true } } } };
   };
 }>;
 
-export type RunWithLatestMonthAndCommitmentsRow = Prisma.BudgetRunGetPayload<{
+export type RunWithLatestMonthAndCommitmentsRow = Prisma.RunGetPayload<{
   include: {
     jobState: {
       include: {
@@ -53,7 +53,7 @@ export type RunWithLatestMonthAndCommitmentsRow = Prisma.BudgetRunGetPayload<{
   };
 }>;
 
-export type RunWithAllMonthsRow = Prisma.BudgetRunGetPayload<{
+export type RunWithAllMonthsRow = Prisma.RunGetPayload<{
   include: {
     jobState: {
       include: {

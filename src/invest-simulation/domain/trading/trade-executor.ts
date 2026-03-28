@@ -38,6 +38,11 @@ export interface AvgPriceInput {
   addPrice: number;
 }
 
+/** Returns true if fractional quantities are allowed for this asset type. */
+export function allowsFractionalQuantity(assetType: string): boolean {
+  return assetType.toLocaleLowerCase() === 'crypto';
+}
+
 export function computeBuyFill(input: BuyFillInput): BuyFillResult {
   const { availableCredits, pricePerUnit, quantity } = input;
 

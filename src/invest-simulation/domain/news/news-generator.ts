@@ -118,7 +118,7 @@ function pickTemplate(templates: string[], seed: string): string {
 
 export function generateNewsFromTransitions(
   events: StateTransitionEvent[],
-  tickIndex: number,
+  tickIndex: bigint,
 ): GeneratedNewsItem[] {
   const items: GeneratedNewsItem[] = [];
 

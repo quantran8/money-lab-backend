@@ -29,7 +29,7 @@ export class InvestPolicyService {
    * Advance all active policy thread instances by one tick.
    * Returns transition events and a global policy impact value.
    */
-  async advanceAll(tickIndex: number, tx: TxClient): Promise<{
+  async advanceAll(tickIndex: bigint, tx: TxClient): Promise<{
     events: PolicyTransitionEvent[];
     globalPolicyImpact: number;
   }> {

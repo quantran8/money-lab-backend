@@ -12,30 +12,30 @@ export class InvestMarketRepository {
   }
 
   async createTick(
-    data: Prisma.InvestMarketTickUncheckedCreateInput,
+    data: Prisma.MarketTickUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investMarketTick.create({ data });
+    return this.client(tx).marketTick.create({ data });
   }
 
   async createPricePoint(
-    data: Prisma.InvestAssetPricePointUncheckedCreateInput,
+    data: Prisma.AssetPricePointUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investAssetPricePoint.create({ data });
+    return this.client(tx).assetPricePoint.create({ data });
   }
 
   async createPricePoints(
-    data: Prisma.InvestAssetPricePointCreateManyInput[],
+    data: Prisma.AssetPricePointCreateManyInput[],
     tx?: TxClient,
   ) {
-    return this.client(tx).investAssetPricePoint.createMany({ data });
+    return this.client(tx).assetPricePoint.createMany({ data });
   }
 
   async createWorldState(
-    data: Prisma.InvestWorldStateAtTickUncheckedCreateInput,
+    data: Prisma.WorldStateAtTickUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investWorldStateAtTick.create({ data });
+    return this.client(tx).worldStateAtTick.create({ data });
   }
 }

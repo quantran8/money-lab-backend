@@ -26,7 +26,7 @@ export class BudgetController {
     @Request() req: { user?: { id: string } },
     @Body() body: StartRunDto,
   ) {
-    return this.budgetService.startBudgetRun(
+    return this.budgetService.startRun(
       getUserId(req),
       body.moduleId,
       body.jobId,
@@ -74,7 +74,7 @@ export class BudgetController {
 
   @Get('active-run')
   getActiveRun(@Request() req: { user?: { id: string } }) {
-    return this.budgetService.getActiveBudgetRun(getUserId(req));
+    return this.budgetService.getActiveRun(getUserId(req));
   }
 
   // @Post('run/:runId/prepare-next-month')

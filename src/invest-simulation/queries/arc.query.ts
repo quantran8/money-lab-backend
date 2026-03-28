@@ -7,13 +7,13 @@ export class InvestArcQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findArcTypes(): Promise<ArcTypeRow[]> {
-    return this.prisma.investWorldArcType.findMany({
+    return this.prisma.worldArcType.findMany({
       orderBy: { id: 'asc' },
     });
   }
 
   async findActiveInstances(): Promise<ArcInstanceWithTypeRow[]> {
-    return this.prisma.investWorldArcInstance.findMany({
+    return this.prisma.worldArcInstance.findMany({
       where: { isActive: true },
       include: { arcType: true },
       orderBy: { id: 'asc' },

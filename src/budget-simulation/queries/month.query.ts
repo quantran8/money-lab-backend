@@ -13,15 +13,15 @@ import type {
   MonthWithRunAndJobLevelAndJars,
   MonthWithJars,
   MonthWithRunAndModule,
-  BudgetMonthJarRow,
-  PendingBudgetMonthEventRow,
+  MonthJarRow,
+  PendingMonthEventRow,
   PendingEventWithTemplateRow,
   ChosenEventsTotalsResult,
 } from '../types/month.types';
 import type {
   LifeEventTemplateRow,
   LifeEventTemplateWithOptionsRow,
-  ModuleEventPoolWeightRow,
+  EventPoolWeightRow,
   LifeEventOptionRow,
 } from '../types/event.types';
 import { TxClient } from '#app/prisma/transaction.runner.js';
@@ -43,21 +43,21 @@ export class BudgetMonthQuery {
     runId: bigint,
     tx?: TxClient,
   ): Promise<MonthPreviousRow | null> {
-    return this.client(tx).budgetRunMonth.findFirst({
-      where: { budgetRunId: runId },
+    return this.client(tx).runMonth.findFirst({
+      where: { runId: runId },
       orderBy: { monthIndex: 'desc' },
       include: { billResolution: true, indexResolution: true },
     });
   }
 
-  /** Month by id with budgetRun (for auth and runId). Pass tx when inside a transaction so reads see uncommitted updates. */
+  /** Month by id with run (for auth and runId). Pass tx when inside a transaction so reads see uncommitted updates. */
   async findMonthWithRun(
     monthId: bigint,
     tx?: TxClient,
   ): Promise<MonthWithRun | null> {
-    return this.client(tx).budgetRunMonth.findUnique({
+    return this.client(tx).runMonth.findUnique({
       where: { id: monthId },
-      include: { budgetRun: true, billResolution: true, indexResolution: true },
+      include: { run: true, billResolution: true, indexResolution: true },
     });
   }
 
@@ -66,10 +66,10 @@ export class BudgetMonthQuery {
     monthId: bigint,
     tx?: TxClient,
   ): Promise<MonthWithRunAndJobLevel | null> {
-    return this.client(tx).budgetRunMonth.findUnique({
+    return this.client(tx).runMonth.findUnique({
       where: { id: monthId },
       include: {
-        budgetRun: {
+        run: {
           include: {
             jobState: {
               include: {
@@ -88,10 +88,10 @@ export class BudgetMonthQuery {
   async findMonthWithRunAndJobLevelAndJars(
     monthId: bigint,
   ): Promise<MonthWithRunAndJobLevelAndJars | null> {
-    return this.prisma.budgetRunMonth.findUnique({
+    return this.prisma.runMonth.findUnique({
       where: { id: monthId },
       include: {
-        budgetRun: {
+        run: {
           include: {
             jobState: {
               include: {
@@ -113,7 +113,7 @@ export class BudgetMonthQuery {
     monthId: bigint,
     tx?: TxClient,
   ): Promise<MonthWithJars | null> {
-    return this.client(tx).budgetRunMonth.findUnique({
+    return this.client(tx).runMonth.findUnique({
       where: { id: monthId },
       include: { jars: true, billResolution: true, indexResolution: true },
     });
@@ -123,10 +123,10 @@ export class BudgetMonthQuery {
   async findMonthWithRunAndJars(
     monthId: bigint,
   ): Promise<MonthWithRunAndJobLevelAndJars | null> {
-    return this.prisma.budgetRunMonth.findUnique({
+    return this.prisma.runMonth.findUnique({
       where: { id: monthId },
       include: {
-        budgetRun: {
+        run: {
           include: {
             jobState: {
               include: {
@@ -148,10 +148,10 @@ export class BudgetMonthQuery {
     monthId: bigint,
     tx?: TxClient,
   ): Promise<MonthWithRunAndModule | null> {
-    return this.client(tx).budgetRunMonth.findUnique({
+    return this.client(tx).runMonth.findUnique({
       where: { id: monthId },
       include: {
-        budgetRun: { include: { module: true } },
+        run: { include: { module: true } },
         indexResolution: true,
       },
     });
@@ -161,8 +161,8 @@ export class BudgetMonthQuery {
   async findMonthById(
     monthId: bigint,
     tx?: TxClient,
-  ): Promise<Prisma.BudgetRunMonthGetPayload<Record<string, never>> | null> {
-    return this.client(tx).budgetRunMonth.findUnique({
+  ): Promise<Prisma.RunMonthGetPayload<Record<string, never>> | null> {
+    return this.client(tx).runMonth.findUnique({
       where: { id: monthId },
     });
   }
@@ -172,10 +172,10 @@ export class BudgetMonthQuery {
     monthId: bigint,
     jarCodes?: string[],
     tx?: TxClient,
-  ): Promise<BudgetMonthJarRow[]> {
-    return this.client(tx).budgetMonthJar.findMany({
+  ): Promise<MonthJarRow[]> {
+    return this.client(tx).monthJar.findMany({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         ...(jarCodes?.length ? { jarCode: { in: jarCodes } } : {}),
       },
     });
@@ -186,10 +186,10 @@ export class BudgetMonthQuery {
     monthId: bigint,
     jarCode: string,
     tx?: TxClient,
-  ): Promise<BudgetMonthJarRow | null> {
-    return this.client(tx).budgetMonthJar.findUnique({
+  ): Promise<MonthJarRow | null> {
+    return this.client(tx).monthJar.findUnique({
       where: {
-        budgetMonthId_jarCode: { budgetMonthId: monthId, jarCode },
+        monthId_jarCode: { monthId: monthId, jarCode },
       },
     });
   }
@@ -199,10 +199,10 @@ export class BudgetMonthQuery {
     monthId: bigint,
     week: number,
     tx?: TxClient,
-  ): Promise<PendingBudgetMonthEventRow | null> {
-    return this.client(tx).budgetMonthEvent.findFirst({
+  ): Promise<PendingMonthEventRow | null> {
+    return this.client(tx).monthEvent.findFirst({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: null,
       },
@@ -216,9 +216,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
+    return this.client(tx).monthEvent.count({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
       },
     });
@@ -230,9 +230,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
+    return this.client(tx).monthEvent.count({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: null,
       },
@@ -245,9 +245,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<PendingEventWithTemplateRow | null> {
-    return this.client(tx).budgetMonthEvent.findFirst({
+    return this.client(tx).monthEvent.findFirst({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: null,
       },
@@ -265,9 +265,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<PendingEventWithTemplateRow | null> {
-    return this.client(tx).budgetMonthEvent.findFirst({
+    return this.client(tx).monthEvent.findFirst({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: null,
         eventSource: EVENT_SOURCE_LIFE,
@@ -286,9 +286,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<PendingEventWithTemplateRow | null> {
-    return this.client(tx).budgetMonthEvent.findFirst({
+    return this.client(tx).monthEvent.findFirst({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: null,
         eventSource: EVENT_SOURCE_WORK,
@@ -307,7 +307,7 @@ export class BudgetMonthQuery {
     eventId: bigint,
     tx?: TxClient,
   ): Promise<PendingEventWithTemplateRow | null> {
-    return this.client(tx).budgetMonthEvent.findFirst({
+    return this.client(tx).monthEvent.findFirst({
       where: {
         id: eventId,
         chosenOptionId: null,
@@ -349,9 +349,9 @@ export class BudgetMonthQuery {
       option: { healthDelta: number; lqiDelta: number } | null;
     }>
   > {
-    return this.client(tx).budgetMonthEvent.findMany({
+    return this.client(tx).monthEvent.findMany({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         chosenOptionId: { not: null },
       },
@@ -380,9 +380,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
+    return this.client(tx).monthEvent.count({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         eventSource: EVENT_SOURCE_LIFE,
       },
@@ -404,9 +404,9 @@ export class BudgetMonthQuery {
     week: number,
     tx?: TxClient,
   ): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
+    return this.client(tx).monthEvent.count({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         week,
         eventSource: EVENT_SOURCE_WORK,
         eventSubtype: EVENT_SUBTYPE_OVERTIME,
@@ -419,9 +419,9 @@ export class BudgetMonthQuery {
     monthId: bigint,
     tx?: TxClient,
   ): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
+    return this.client(tx).monthEvent.count({
       where: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         eventSource: EVENT_SOURCE_WORK,
         eventSubtype: EVENT_SUBTYPE_OVERTIME,
       },
@@ -439,8 +439,8 @@ export class BudgetMonthQuery {
 
   /** Count events created for this month (for max_event_count_per_month cap). Pass tx when inside a transaction. */
   async countEventsForMonth(monthId: bigint, tx?: TxClient): Promise<number> {
-    return this.client(tx).budgetMonthEvent.count({
-      where: { budgetMonthId: monthId },
+    return this.client(tx).monthEvent.count({
+      where: { monthId: monthId },
     });
   }
 
@@ -455,9 +455,9 @@ export class BudgetMonthQuery {
     >`
       SELECT COALESCE(SUM(o.health_delta), 0)::int AS health_total,
              COALESCE(SUM(o.lqi_delta), 0)::int    AS lqi_total
-      FROM budget_month_events e
-      JOIN life_event_options o ON e.chosen_option_id = o.id
-      WHERE e.budget_month_id = ${monthId}
+      FROM budget.month_events e
+      JOIN budget.life_event_options o ON e.chosen_option_id = o.id
+      WHERE e.month_id = ${monthId}
         AND e.chosen_option_id IS NOT NULL
     `;
     const row = result[0];
@@ -473,10 +473,10 @@ export class BudgetMonthQuery {
     fromMonthIndex: number,
     toMonthIndex: number,
   ): Promise<bigint[]> {
-    const events = await this.prisma.budgetMonthEvent.findMany({
+    const events = await this.prisma.monthEvent.findMany({
       where: {
         month: {
-          budgetRunId: runId,
+          runId: runId,
           monthIndex: {
             gte: fromMonthIndex,
             lte: toMonthIndex,
@@ -494,11 +494,11 @@ export class BudgetMonthQuery {
     fromMonthIndex: number,
     toMonthIndex: number,
   ): Promise<bigint[]> {
-    const events = await this.prisma.budgetMonthEvent.findMany({
+    const events = await this.prisma.monthEvent.findMany({
       where: {
         eventSource: EVENT_SOURCE_LIFE,
         month: {
-          budgetRunId: runId,
+          runId: runId,
           monthIndex: {
             gte: fromMonthIndex,
             lte: toMonthIndex,
@@ -550,8 +550,8 @@ export class BudgetMonthQuery {
   async findEventPoolWeights(
     moduleId: number,
     lqiState: string,
-  ): Promise<ModuleEventPoolWeightRow[]> {
-    return this.prisma.moduleEventPoolWeight.findMany({
+  ): Promise<EventPoolWeightRow[]> {
+    return this.prisma.eventPoolWeight.findMany({
       where: { moduleId, lqiState },
     });
   }
@@ -576,9 +576,9 @@ export class BudgetMonthQuery {
     >`
       SELECT COALESCE(SUM(o.health_delta), 0)::int AS health_total,
              COALESCE(SUM(o.lqi_delta), 0)::int    AS lqi_total
-      FROM budget_month_events e
-      JOIN life_event_options o ON e.chosen_option_id = o.id
-      WHERE e.budget_month_id = ${monthId}
+      FROM budget.month_events e
+      JOIN budget.life_event_options o ON e.chosen_option_id = o.id
+      WHERE e.month_id = ${monthId}
         AND e.week = ${week}
         AND e.chosen_option_id IS NOT NULL
     `;

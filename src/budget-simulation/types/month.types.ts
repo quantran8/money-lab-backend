@@ -1,23 +1,23 @@
 import { Prisma } from '@prisma/client';
 
 /** Previous month row with bill + index resolution. */
-export type MonthPreviousRow = Prisma.BudgetRunMonthGetPayload<{
+export type MonthPreviousRow = Prisma.RunMonthGetPayload<{
   include: { billResolution: true; indexResolution: true };
 }>;
 
 /** Month with run, bill + index resolution. */
-export type MonthWithRun = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithRun = Prisma.RunMonthGetPayload<{
   include: {
-    budgetRun: true;
+    run: true;
     billResolution: true;
     indexResolution: true;
   };
 }>;
 
 /** Month with run, job levels (forced rest), bill + index resolution. */
-export type MonthWithRunAndJobLevel = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithRunAndJobLevel = Prisma.RunMonthGetPayload<{
   include: {
-    budgetRun: {
+    run: {
       include: {
         jobState: {
           include: {
@@ -32,9 +32,9 @@ export type MonthWithRunAndJobLevel = Prisma.BudgetRunMonthGetPayload<{
 }>;
 
 /** Full resolveWeek load shape: run, module, job levels, jars, resolutions. */
-export type MonthWithRunAndJobLevelAndJars = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithRunAndJobLevelAndJars = Prisma.RunMonthGetPayload<{
   include: {
-    budgetRun: {
+    run: {
       include: {
         jobState: {
           include: {
@@ -51,7 +51,7 @@ export type MonthWithRunAndJobLevelAndJars = Prisma.BudgetRunMonthGetPayload<{
 }>;
 
 /** Month with jars + resolutions. */
-export type MonthWithJars = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithJars = Prisma.RunMonthGetPayload<{
   include: {
     jars: true;
     billResolution: true;
@@ -60,9 +60,9 @@ export type MonthWithJars = Prisma.BudgetRunMonthGetPayload<{
 }>;
 
 /** Month with run (job levels), jars — applyEventChoice load. */
-export type MonthWithRunAndJars = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithRunAndJars = Prisma.RunMonthGetPayload<{
   include: {
-    budgetRun: {
+    run: {
       include: {
         jobState: {
           include: {
@@ -78,19 +78,19 @@ export type MonthWithRunAndJars = Prisma.BudgetRunMonthGetPayload<{
 }>;
 
 /** Month with run.module + index (spawn event LQI). */
-export type MonthWithRunAndModule = Prisma.BudgetRunMonthGetPayload<{
+export type MonthWithRunAndModule = Prisma.RunMonthGetPayload<{
   include: {
-    budgetRun: { include: { module: true } };
+    run: { include: { module: true } };
     indexResolution: true;
   };
 }>;
 
-export type BudgetMonthJarRow = Prisma.BudgetMonthJarGetPayload<Record<string, never>>;
+export type MonthJarRow = Prisma.MonthJarGetPayload<Record<string, never>>;
 
-export type PendingBudgetMonthEventRow =
-  Prisma.BudgetMonthEventGetPayload<Record<string, never>>;
+export type PendingMonthEventRow =
+  Prisma.MonthEventGetPayload<Record<string, never>>;
 
-export type PendingEventWithTemplateRow = Prisma.BudgetMonthEventGetPayload<{
+export type PendingEventWithTemplateRow = Prisma.MonthEventGetPayload<{
   include: {
     template: {
       include: { options: { orderBy: { sortOrder: 'asc' } } };

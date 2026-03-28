@@ -8,15 +8,15 @@ import { PrismaService } from '#app/prisma/prisma.service.js';
  * Pass tx when running inside a transaction.
  */
 @Injectable()
-export class BudgetRunRepository {
+export class RunRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private client(tx?: TxClient) {
     return tx ?? this.prisma;
   }
 
-  async createRun(data: Prisma.BudgetRunUncheckedCreateInput, tx?: TxClient) {
-    return this.client(tx).budgetRun.create({ data });
+  async createRun(data: Prisma.RunUncheckedCreateInput, tx?: TxClient) {
+    return this.client(tx).run.create({ data });
   }
 
   async createUserJobState(
@@ -47,7 +47,7 @@ export class BudgetRunRepository {
   ) {
     const client = this.client(tx);
     await client.$executeRaw`
-      UPDATE user_job_state
+      UPDATE budget.user_job_state
       SET xp = GREATEST(0, xp + ${delta})
       WHERE id = ${id}
     `;
@@ -69,7 +69,7 @@ export class BudgetRunRepository {
     tx?: TxClient,
   ) {
     await this.client(tx).userRunCommitment.deleteMany({
-      where: { budgetRunId: runId, commitmentTemplateId },
+      where: { runId: runId, commitmentTemplateId },
     });
   }
 
@@ -87,7 +87,7 @@ export class BudgetRunRepository {
     if (commitmentTemplateIds.length === 0) return;
     await this.client(tx).userRunCommitment.updateMany({
       where: {
-        budgetRunId: runId,
+        runId: runId,
         commitmentTemplateId: { in: commitmentTemplateIds },
         effectiveFromMonthIndex: { lte: effectiveToMonthIndex },
       },
@@ -104,7 +104,7 @@ export class BudgetRunRepository {
     },
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetRun.update({
+    return this.client(tx).run.update({
       where: { id: runId },
       data: {
         finishedAt: new Date(),
@@ -127,7 +127,7 @@ export class BudgetRunRepository {
     tx?: TxClient,
   ) {
     await this.client(tx).userRunCommitment.updateMany({
-      where: { budgetRunId: runId, commitmentTemplateId },
+      where: { runId: runId, commitmentTemplateId },
       data: {
         selectedAmount,
         effectiveFromMonthIndex,
@@ -149,7 +149,7 @@ export class BudgetRunRepository {
     await Promise.all(
       updates.map(({ commitmentTemplateId, selectedAmount }) =>
         client.userRunCommitment.updateMany({
-          where: { budgetRunId: runId, commitmentTemplateId },
+          where: { runId: runId, commitmentTemplateId },
           data: { selectedAmount },
         }),
       ),

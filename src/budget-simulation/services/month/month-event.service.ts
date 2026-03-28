@@ -6,7 +6,7 @@ import {
 import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
-import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { BudgetSimulationConfigService } from '../config.service';
 import { JarCode, LqiState } from '#budget-simulation/budget-simulation.enum.js';
 import {
@@ -60,7 +60,7 @@ export class MonthEventService {
     private readonly transactionRunner: TransactionRunner,
     private readonly monthQuery: BudgetMonthQuery,
     private readonly monthRepository: BudgetMonthRepository,
-    private readonly runRepository: BudgetRunRepository,
+    private readonly runRepository: RunRepository,
     private readonly configService: BudgetSimulationConfigService,
     private readonly spendService: MonthSpendService,
     private readonly indexService: MonthIndexService,
@@ -76,9 +76,9 @@ export class MonthEventService {
     month: MonthWithRunAndJobLevelAndJars,
     row: PendingEventWithTemplateRow,
   ): SpawnEventTemplatePayload {
-    const job = month.budgetRun.jobState?.job;
+    const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.budgetRun.jobState?.level) ??
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
       null;
     const isOt =
       row.eventSource === EVENT_SOURCE_WORK &&
@@ -94,7 +94,7 @@ export class MonthEventService {
 
     return {
       eventId: row.id.toString(),
-      eventSource: row.eventSource,
+      eventSource: row.eventSource ?? 'life',
       eventSubtype: row.eventSubtype,
       templateId: row.template.id.toString(),
       title: row.template.title,
@@ -148,7 +148,7 @@ export class MonthEventService {
     week: number,
   ): Promise<bigint | null> {
     const config = this.configService.getConfig();
-    const moduleId = month.budgetRun.moduleId;
+    const moduleId = month.run.moduleId;
 
     if (month.stressModeActive) {
       const maxEvents =
@@ -157,7 +157,7 @@ export class MonthEventService {
       if (eventCount >= maxEvents) return null;
     }
 
-    const seedBase = `${month.budgetRunId}:${month.monthIndex}:${week}`;
+    const seedBase = `${month.runId}:${month.monthIndex}:${week}`;
     if (!shouldSpawn(`${seedBase}:spawn`)) return null;
 
     const lqiState =
@@ -169,12 +169,12 @@ export class MonthEventService {
     const [usedIds, weightsRows] = await Promise.all([
       moduleId === BUDGET_SIMULATION_MODULE_ID
         ? this.monthQuery.findUsedLifeEventTemplateIds(
-            month.budgetRunId,
+            month.runId,
             fromMonth,
             month.monthIndex,
           )
         : this.monthQuery.findUsedEventTemplateIds(
-            month.budgetRunId,
+            month.runId,
             fromMonth,
             month.monthIndex,
           ),
@@ -232,7 +232,7 @@ export class MonthEventService {
     month: MonthWithRunAndJobLevelAndJars,
     week: number,
   ): Promise<bigint | null> {
-    if (month.budgetRun.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
+    if (month.run.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
       return null;
     }
     const config = this.configService.getConfig();
@@ -255,7 +255,7 @@ export class MonthEventService {
       if (eventCount >= maxEvents) return null;
     }
 
-    const jobState = month.budgetRun.jobState;
+    const jobState = month.run.jobState;
     const level =
       jobState?.job?.levels.find((l) => l.level === jobState.level) ?? null;
     const cap = level?.overtimeMonthlyCap;
@@ -274,7 +274,7 @@ export class MonthEventService {
     }
 
     const p = Number(level?.overtimeSpawnWeight ?? 0);
-    const seedBase = `${month.budgetRunId}:${month.monthIndex}:${week}:ot`;
+    const seedBase = `${month.runId}:${month.monthIndex}:${week}:ot`;
     if (!shouldSpawnLane(seedBase, p)) return null;
 
     return tpl.id;
@@ -294,9 +294,9 @@ export class MonthEventService {
       week,
       tx,
     );
-    const job = month.budgetRun.jobState?.job;
+    const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.budgetRun.jobState?.level) ??
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
       null;
     let healthDeltaTotal = 0;
     let lqiDeltaTotal = 0;
@@ -394,7 +394,7 @@ export class MonthEventService {
       this.monthQuery.findLifeEventOptionById(optionIdBig),
     ]);
 
-    if (!month || month.budgetRun.userId !== userId) {
+    if (!month || month.run.userId !== userId) {
       throw new BadRequestException('Month not found');
     }
     if (!option) {
@@ -406,7 +406,7 @@ export class MonthEventService {
       event = await this.monthQuery.findPendingEventWithTemplateById(
         BigInt(eventId),
       );
-      if (!event || event.budgetMonthId !== monthIdBig || event.week !== week) {
+      if (!event || event.monthId !== monthIdBig || event.week !== week) {
         throw new BadRequestException('Invalid or resolved event');
       }
     } else {
@@ -415,7 +415,7 @@ export class MonthEventService {
         this.monthQuery.findPendingOvertimeEventWithTemplate(monthIdBig, week),
       ]);
       event = life ?? ot;
-      if (!event && month.budgetRun.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
+      if (!event && month.run.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
         event = await this.monthQuery.findPendingEventWithTemplate(
           monthIdBig,
           week,
@@ -444,9 +444,9 @@ export class MonthEventService {
       );
     }
 
-    const job = month.budgetRun.jobState?.job;
+    const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.budgetRun.jobState?.level) ??
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
       null;
     const sortedOpts = [...event.template.options].sort(
       (a, b) => a.sortOrder - b.sortOrder,
@@ -643,10 +643,10 @@ export class MonthEventService {
         );
       }
 
-      if (learningXpDelta !== 0 && month.budgetRun.jobStateId != null) {
+      if (learningXpDelta !== 0 && month.run.jobStateId != null) {
         writeOps.push(
           this.runRepository.incrementUserJobStateXpBounded(
-            month.budgetRun.jobStateId,
+            month.run.jobStateId,
             learningXpDelta,
             tx,
           ),
@@ -697,7 +697,7 @@ export class MonthEventService {
 
       if (week === END_OF_MONTH_WEEK && monthAfterPayment && jarsAfterPayment) {
         const billResult = await this.billService.computeBills(
-          Number(month.budgetRunId),
+          Number(month.runId),
           month.monthIndex,
           month.billsEstimated,
         );
@@ -766,13 +766,13 @@ export class MonthEventService {
 
     if (txResult.monthComplete) {
       if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
-        await this.runRepository.completeRun(month.budgetRunId, {
+        await this.runRepository.completeRun(month.runId, {
           totalMonths: month.monthIndex,
           finalFutureYouSavings: txResult.futureYouTotal,
           passed: txResult.futureYouTotal > 0,
         });
         runComplete = true;
-        runAnalysis = await this.analyzeService.analyzeRun(Number(month.budgetRunId));
+        runAnalysis = await this.analyzeService.analyzeRun(Number(month.runId));
       } else {
         nextMonthPreview = await this.previewService.computePreview(month);
       }

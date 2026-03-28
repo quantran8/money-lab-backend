@@ -11,13 +11,13 @@ export class InvestSpotlightQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findTemplates(): Promise<SpotlightTemplateRow[]> {
-    return this.prisma.investAssetSpotlightTemplate.findMany({
+    return this.prisma.assetSpotlightTemplate.findMany({
       orderBy: { id: 'asc' },
     });
   }
 
   async findActiveInstances(): Promise<SpotlightInstanceFullRow[]> {
-    return this.prisma.investAssetSpotlightInstance.findMany({
+    return this.prisma.assetSpotlightInstance.findMany({
       where: { isActive: true },
       include: { template: true, asset: { include: { sector: true } } },
       orderBy: { id: 'asc' },
@@ -25,7 +25,7 @@ export class InvestSpotlightQuery {
   }
 
   async findInstancesByAsset(assetId: bigint): Promise<SpotlightInstanceRow[]> {
-    return this.prisma.investAssetSpotlightInstance.findMany({
+    return this.prisma.assetSpotlightInstance.findMany({
       where: { assetId },
       orderBy: { createdAt: 'desc' },
     });

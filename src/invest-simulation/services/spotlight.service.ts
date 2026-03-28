@@ -11,7 +11,7 @@ import {
   type SpotlightTransitionEvent,
 } from '../domain/index.js';
 
-const SPOTLIGHT_COOLDOWN_TICKS = 10;
+const SPOTLIGHT_COOLDOWN_TICKS = 10n;
 
 @Injectable()
 export class InvestSpotlightService {
@@ -26,7 +26,7 @@ export class InvestSpotlightService {
    * Advance all active spotlight instances by one tick.
    * Returns transition events for news generation and a per-asset impact map.
    */
-  async advanceAll(tickIndex: number, tx: TxClient): Promise<{
+  async advanceAll(tickIndex: bigint, tx: TxClient): Promise<{
     events: SpotlightTransitionEvent[];
     assetImpacts: Record<string, number>;
   }> {

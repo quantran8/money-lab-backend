@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
 import { TransactionRunner } from '#app/prisma/transaction.runner.js';
-import { InvestMissionQuery } from '../queries/mission.query.js';
+import { MissionQuery } from '../queries/mission.query.js';
 import { InvestBehaviorQuery } from '../queries/behavior.query.js';
 import { InvestScoreQuery } from '../queries/score.query.js';
 import { InvestPortfolioQuery } from '../queries/portfolio.query.js';
-import { InvestMissionRepository } from '../repositories/mission.repository.js';
+import { MissionRepository } from '../repositories/mission.repository.js';
 import {
   matchMissions,
   type MissionDefinition,
@@ -13,16 +13,16 @@ import {
 } from '../domain/index.js';
 
 @Injectable()
-export class InvestMissionService {
-  private readonly logger = new Logger(InvestMissionService.name);
+export class MissionService {
+  private readonly logger = new Logger(MissionService.name);
 
   constructor(
     private readonly transactionRunner: TransactionRunner,
-    private readonly missionQuery: InvestMissionQuery,
+    private readonly missionQuery: MissionQuery,
     private readonly behaviorQuery: InvestBehaviorQuery,
     private readonly scoreQuery: InvestScoreQuery,
     private readonly portfolioQuery: InvestPortfolioQuery,
-    private readonly missionRepo: InvestMissionRepository,
+    private readonly missionRepo: MissionRepository,
   ) {}
 
   async getUserMissions(userId: string) {

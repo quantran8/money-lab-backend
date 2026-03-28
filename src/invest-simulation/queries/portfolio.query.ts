@@ -12,20 +12,20 @@ export class InvestPortfolioQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findUserCredit(userId: string): Promise<UserCreditRow | null> {
-    return this.prisma.investUserCredit.findUnique({
+    return this.prisma.userCredit.findUnique({
       where: { userId },
     });
   }
 
   async findPositions(userId: string): Promise<PositionRow[]> {
-    return this.prisma.investPortfolioPosition.findMany({
+    return this.prisma.portfolioPosition.findMany({
       where: { userId, quantity: { gt: 0 } },
       orderBy: { assetId: 'asc' },
     });
   }
 
   async findPositionsWithAsset(userId: string): Promise<PositionWithAssetRow[]> {
-    return this.prisma.investPortfolioPosition.findMany({
+    return this.prisma.portfolioPosition.findMany({
       where: { userId, quantity: { gt: 0 } },
       include: { asset: { include: { sector: true } } },
       orderBy: { assetId: 'asc' },
@@ -33,7 +33,7 @@ export class InvestPortfolioQuery {
   }
 
   async findPosition(userId: string, assetId: bigint): Promise<PositionRow | null> {
-    return this.prisma.investPortfolioPosition.findUnique({
+    return this.prisma.portfolioPosition.findUnique({
       where: { userId_assetId: { userId, assetId } },
     });
   }
@@ -43,7 +43,7 @@ export class InvestPortfolioQuery {
     limit: number = 50,
     offset: number = 0,
   ): Promise<TransactionWithAssetRow[]> {
-    return this.prisma.investPortfolioTransaction.findMany({
+    return this.prisma.portfolioTransaction.findMany({
       where: { userId },
       include: { asset: true },
       orderBy: { createdAt: 'desc' },

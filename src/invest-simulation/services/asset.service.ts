@@ -1,22 +1,39 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { InvestAssetQuery } from '../queries/asset.query.js';
+import { AssetQuery, type AssetFilter } from '../queries/asset.query.js';
 import { InvestMarketQuery } from '../queries/market.query.js';
 import { DEFAULT_PRICE_HISTORY_LIMIT } from '../invest-simulation.constant.js';
 
 @Injectable()
-export class InvestAssetService {
-  private readonly logger = new Logger(InvestAssetService.name);
+export class AssetService {
+  private readonly logger = new Logger(AssetService.name);
 
   constructor(
-    private readonly assetQuery: InvestAssetQuery,
+    private readonly assetQuery: AssetQuery,
     private readonly marketQuery: InvestMarketQuery,
   ) {}
 
-  async getAssetList() {
+  async getSectors() {
+    return wrapAsync(this.logger, 'getSectors', async () => {
+      const sectors = await this.assetQuery.findAllSectors();
+      return sectors.map((s) => ({
+        id: s.id,
+        code: s.code,
+        name: s.name,
+        description: s.description,
+      }));
+    });
+  }
+
+  async getAssetList(
+    filter: AssetFilter = {},
+    limit: number = 50,
+    offset: number = 0,
+  ) {
     return wrapAsync(this.logger, 'getAssetList', async () => {
-      const [assets, tick] = await Promise.all([
-        this.assetQuery.findAllWithSector(),
+      const [assets, total, tick] = await Promise.all([
+        this.assetQuery.findAllWithSector(filter, limit, offset),
+        this.assetQuery.countAll(filter),
         this.marketQuery.findCurrentTick(),
       ]);
 
@@ -31,16 +48,21 @@ export class InvestAssetService {
         }
       }
 
-      return assets.map((a) => ({
-        id: a.id.toString(),
-        code: a.code,
-        name: a.name,
-        assetType: a.assetType,
-        riskTier: a.riskTier,
-        sector: { id: a.sector.id, code: a.sector.code, name: a.sector.name },
-        latestPrice: priceMap[a.id.toString()]?.price ?? null,
-        changePct: priceMap[a.id.toString()]?.changePct ?? null,
-      }));
+      return {
+        data: assets.map((a) => ({
+          id: a.id.toString(),
+          code: a.code,
+          name: a.name,
+          assetType: a.assetType,
+          riskTier: a.riskTier,
+          sector: { id: a.sector.id, code: a.sector.code, name: a.sector.name },
+          latestPrice: priceMap[a.id.toString()]?.price ?? null,
+          changePct: priceMap[a.id.toString()]?.changePct ?? null,
+        })),
+        total,
+        limit,
+        offset,
+      };
     });
   }
 
@@ -62,8 +84,12 @@ export class InvestAssetService {
         volatilityProfile: asset.volatilityProfile,
         attentionSensitivity: asset.attentionSensitivity,
         description: asset.description,
-        sector: { id: asset.sector.id, code: asset.sector.code, name: asset.sector.name },
-        priceHistory: priceHistory.map((p) => ({
+        sector: {
+          id: asset.sector.id,
+          code: asset.sector.code,
+          name: asset.sector.name,
+        },
+        priceHistory: [...priceHistory].reverse().map((p) => ({
           tickId: p.tickId.toString(),
           price: p.price,
           changeFromPrev: p.changeFromPrev,

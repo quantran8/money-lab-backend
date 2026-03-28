@@ -11,13 +11,13 @@ export class InvestMarketQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findCurrentTick(): Promise<MarketTickRow | null> {
-    return this.prisma.investMarketTick.findFirst({
+    return this.prisma.marketTick.findFirst({
       orderBy: { tickIndex: 'desc' },
     });
   }
 
   async findCurrentTickWithWorldState(): Promise<TickWithWorldStateRow | null> {
-    return this.prisma.investMarketTick.findFirst({
+    return this.prisma.marketTick.findFirst({
       orderBy: { tickIndex: 'desc' },
       include: { worldState: true },
     });
@@ -25,7 +25,7 @@ export class InvestMarketQuery {
 
   /** Latest price for each active asset at or before the given tick. */
   async findLatestPrices(tickId: bigint): Promise<PricePointRow[]> {
-    return this.prisma.investAssetPricePoint.findMany({
+    return this.prisma.assetPricePoint.findMany({
       where: { tickId },
       orderBy: { assetId: 'asc' },
     });
@@ -33,14 +33,14 @@ export class InvestMarketQuery {
 
   /** Latest single price for one asset. */
   async findLatestPriceForAsset(assetId: bigint, tickId: bigint): Promise<PricePointRow | null> {
-    return this.prisma.investAssetPricePoint.findFirst({
+    return this.prisma.assetPricePoint.findFirst({
       where: { assetId, tickId },
     });
   }
 
   /** Price history for a single asset (most recent first). */
   async findPriceHistory(assetId: bigint, limit: number): Promise<PricePointRow[]> {
-    return this.prisma.investAssetPricePoint.findMany({
+    return this.prisma.assetPricePoint.findMany({
       where: { assetId },
       orderBy: { tickId: 'desc' },
       take: limit,

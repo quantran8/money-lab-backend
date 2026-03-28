@@ -5,8 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { BudgetRunQuery } from '../../queries/run.query';
-import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { RunQuery } from '../../queries/run.query';
+import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { CommitmentQuery } from '../../queries/commitment.query';
 import type {
   OptionalCommitmentUpdateInput,
@@ -25,8 +25,8 @@ export class BudgetSimulationRunCommitmentService {
 
   constructor(
     private readonly transactionRunner: TransactionRunner,
-    private readonly runQuery: BudgetRunQuery,
-    private readonly runRepository: BudgetRunRepository,
+    private readonly runQuery: RunQuery,
+    private readonly runRepository: RunRepository,
     private readonly commitmentQuery: CommitmentQuery,
   ) {}
 
@@ -170,7 +170,7 @@ export class BudgetSimulationRunCommitmentService {
               await this.runRepository.createRunCommitments(
                 [
                   {
-                    budgetRunId: runIdBig,
+                    runId: runIdBig,
                     commitmentTemplateId,
                     selectedAmount,
                     effectiveFromMonthIndex: nextFromMonthIndex,
@@ -199,7 +199,7 @@ export class BudgetSimulationRunCommitmentService {
               await this.runRepository.createRunCommitments(
                 [
                   {
-                    budgetRunId: runIdBig,
+                    runId: runIdBig,
                     commitmentTemplateId,
                     selectedAmount,
                     effectiveFromMonthIndex: nextFromMonthIndex,
@@ -257,7 +257,7 @@ export class BudgetSimulationRunCommitmentService {
               await this.runRepository.createRunCommitments(
                 [
                   {
-                    budgetRunId: runIdBig,
+                    runId: runIdBig,
                     commitmentTemplateId,
                     selectedAmount: item.amount,
                     effectiveFromMonthIndex: nextFromMonthIndex,

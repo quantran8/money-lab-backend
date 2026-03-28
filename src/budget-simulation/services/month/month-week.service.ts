@@ -8,7 +8,7 @@ import { wrapAsync } from '#common/utils/async.utils.js';
 import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
-import { BudgetRunRepository } from '#budget-simulation/repositories/run.repository.js';
+import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { JarCode, SpendModeCode } from '#budget-simulation/budget-simulation.enum.js';
 import {
   END_OF_MONTH_WEEK,
@@ -72,7 +72,7 @@ export class MonthWeekService {
     private readonly indexService: MonthIndexService,
     private readonly billService: MonthBillService,
     private readonly previewService: NextMonthPreviewService,
-    private readonly runRepository: BudgetRunRepository,
+    private readonly runRepository: RunRepository,
     private readonly analyzeService: RunAnalyzeService,
   ) {}
 
@@ -158,7 +158,7 @@ export class MonthWeekService {
         overtimeEventTemplateIdToCreate,
       } = ctx;
 
-      if (month.budgetRun.userId !== userId)
+      if (month.run.userId !== userId)
         throw new BadRequestException('Month not found');
       if (
         month.monthIndex >= RUN_MONTH_INDEX_COMPLETE &&
@@ -185,7 +185,7 @@ export class MonthWeekService {
       );
       let incomeLossFromForcedRest = 0;
       if (didForcedRest) {
-        const jobState = month.budgetRun.jobState;
+        const jobState = month.run.jobState;
         const levels = jobState?.job?.levels ?? [];
         const levelRow =
           levels.find((l) => l.level === jobState?.level) ?? levels[0];
@@ -195,7 +195,7 @@ export class MonthWeekService {
             : 0;
       }
 
-      const currentJobLevel = month.budgetRun.jobState?.level ?? 1;
+      const currentJobLevel = month.run.jobState?.level ?? 1;
 
       const spendResult = this.spendService.computeWeeklySpend(
         month,
@@ -267,11 +267,11 @@ export class MonthWeekService {
 
         if (
           spendResult.learningXpDelta > 0 &&
-          month.budgetRun.jobStateId != null
+          month.run.jobStateId != null
         ) {
           spendWriteOps.push(
             this.runRepository.incrementUserJobStateXpBounded(
-              month.budgetRun.jobStateId,
+              month.run.jobStateId,
               spendResult.learningXpDelta,
               tx,
             ),
@@ -327,7 +327,7 @@ export class MonthWeekService {
           null;
         if (nextWeek === END_OF_MONTH_WEEK && !hasPendingEvents) {
           const billResult = await this.billService.computeBills(
-            Number(month.budgetRunId),
+            Number(month.runId),
             month.monthIndex,
             month.billsEstimated,
           );
@@ -396,7 +396,7 @@ export class MonthWeekService {
       let jobProgress: JobProgressResult | undefined;
 
       if (monthComplete) {
-        const jobState = month.budgetRun.jobState;
+        const jobState = month.run.jobState;
         if (jobState) {
           const levels = (jobState.job?.levels ?? []).map((l) => ({
             level: l.level,
@@ -413,14 +413,14 @@ export class MonthWeekService {
         }
 
         if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
-          await this.runRepository.completeRun(month.budgetRunId, {
+          await this.runRepository.completeRun(month.runId, {
             totalMonths: month.monthIndex,
             finalFutureYouSavings: futureTotal,
             passed: futureTotal > 0,
           });
           runComplete = true;
           runAnalysis = await this.analyzeService.analyzeRun(
-            Number(month.budgetRunId),
+            Number(month.runId),
           );
         } else {
           nextMonthPreview = await this.previewService.computePreview(month);

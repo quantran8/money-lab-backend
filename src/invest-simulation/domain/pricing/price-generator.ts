@@ -20,7 +20,7 @@ export interface PriceImpacts {
 export interface GeneratePriceInput {
   assetId: bigint;
   prevPrice: number;
-  tickIndex: number;
+  tickIndex: bigint;
   impacts: PriceImpacts;
   /** Volatility profile of the asset: 'low' | 'medium' | 'high' | 'extreme'. */
   volatilityProfile: string;
@@ -88,7 +88,7 @@ export function combineImpacts(impacts: PriceImpacts): number {
 export function generateTickPrices(
   assets: Array<{ id: bigint; volatilityProfile: string }>,
   prevPrices: Record<string, number>,
-  tickIndex: number,
+  tickIndex: bigint,
   impactsPerAsset: Record<string, PriceImpacts>,
 ): Record<string, GeneratePriceResult> {
   const results: Record<string, GeneratePriceResult> = {};

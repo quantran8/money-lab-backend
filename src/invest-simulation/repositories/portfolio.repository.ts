@@ -12,10 +12,10 @@ export class InvestPortfolioRepository {
   }
 
   async createTransaction(
-    data: Prisma.InvestPortfolioTransactionUncheckedCreateInput,
+    data: Prisma.PortfolioTransactionUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investPortfolioTransaction.create({ data });
+    return this.client(tx).portfolioTransaction.create({ data });
   }
 
   async upsertPosition(
@@ -25,7 +25,7 @@ export class InvestPortfolioRepository {
     newAvgPrice: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investPortfolioPosition.upsert({
+    return this.client(tx).portfolioPosition.upsert({
       where: { userId_assetId: { userId, assetId } },
       update: {
         quantity: { increment: quantityDelta },
@@ -46,7 +46,7 @@ export class InvestPortfolioRepository {
     quantityToSell: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investPortfolioPosition.update({
+    return this.client(tx).portfolioPosition.update({
       where: { userId_assetId: { userId, assetId } },
       data: { quantity: { decrement: quantityToSell } },
     });
@@ -57,7 +57,7 @@ export class InvestPortfolioRepository {
     assetId: bigint,
     tx?: TxClient,
   ) {
-    await this.client(tx).investPortfolioPosition.deleteMany({
+    await this.client(tx).portfolioPosition.deleteMany({
       where: { userId, assetId, quantity: { lte: 0 } },
     });
   }
@@ -73,7 +73,7 @@ export class InvestPortfolioRepository {
   ): Promise<number> {
     const client = this.client(tx);
     const result = await (client as PrismaService).$executeRaw`
-      UPDATE invest_user_credits
+      UPDATE invest.user_credits
       SET balance = balance - ${amount},
           updated_at = NOW()
       WHERE user_id = ${userId}::uuid
@@ -90,7 +90,7 @@ export class InvestPortfolioRepository {
   ): Promise<void> {
     const client = this.client(tx);
     await (client as PrismaService).$executeRaw`
-      UPDATE invest_user_credits
+      UPDATE invest.user_credits
       SET balance = balance + ${amount},
           updated_at = NOW()
       WHERE user_id = ${userId}::uuid
@@ -103,7 +103,7 @@ export class InvestPortfolioRepository {
     initialBalance: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserCredit.upsert({
+    return this.client(tx).userCredit.upsert({
       where: { userId },
       update: {},
       create: { userId, balance: initialBalance },

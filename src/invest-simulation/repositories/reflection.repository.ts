@@ -12,9 +12,9 @@ export class InvestReflectionRepository {
   }
 
   async createReflection(
-    data: Prisma.InvestUserReflectionUncheckedCreateInput,
+    data: Prisma.UserReflectionUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserReflection.create({ data });
+    return this.client(tx).userReflection.create({ data });
   }
 }

@@ -79,7 +79,7 @@ export class InvestNewsService {
    */
   async generateNewsForTick(
     tickId: bigint,
-    tickIndex: number,
+    tickIndex: bigint,
     simDay: number,
     simMonth: number,
     simYear: number,

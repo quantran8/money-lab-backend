@@ -20,17 +20,17 @@ export class BudgetSimulationService {
     return this.setupService.getSetupOptions();
   }
 
-  async getActiveBudgetRun(userId: string) {
-    return this.runService.getActiveBudgetRun(userId);
+  async getActiveRun(userId: string) {
+    return this.runService.getActiveRun(userId);
   }
 
-  async startBudgetRun(
+  async startRun(
     userId: string,
     moduleId: number,
     jobId: number,
     commitmentAmounts: Record<number, number>,
   ) {
-    return this.runService.startBudgetRun(
+    return this.runService.startRun(
       userId,
       moduleId,
       jobId,

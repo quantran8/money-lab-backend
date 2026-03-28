@@ -95,7 +95,7 @@ export interface WeeklySpendInput {
   spendModeCode: string;
   monthIndex: number;
   nextWeek: number;
-  budgetRunId: string;
+  runId: string;
   monthId: string;
   /** Required for learning XP calculation. */
   playerHI: number;
@@ -154,7 +154,7 @@ const WEEKS_PER_MONTH = NUMBER_OF_WEEKS_PER_MONTH;
 export function computeWeeklySpend(input: WeeklySpendInput): WeeklySpendResult {
   const {
     jars, spendModeRate, spendModeCode, monthIndex, nextWeek,
-    budgetRunId, monthId, playerHI, currentJobLevel, config,
+    runId, monthId, playerHI, currentJobLevel, config,
   } = input;
   const coreJars = jars.filter((j) => CORE_JAR_CODES.includes(j.jarCode));
 
@@ -188,7 +188,7 @@ export function computeWeeklySpend(input: WeeklySpendInput): WeeklySpendResult {
       spendOps.push({ jarCode: jar, amount: spentAmount });
       const weekGlobal = (monthIndex - 1) * WEEKS_PER_MONTH + nextWeek;
       const label = genAutoSpendLabel(
-        `${budgetRunId}:${monthId}:${jar}`,
+        `${runId}:${monthId}:${jar}`,
         jar,
         spentAmount,
         spendModeCode,

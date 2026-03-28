@@ -1,10 +1,15 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(xargs perl:*)",
+      "Bash(ls /Users/quantran/Work/ML/money-lab-backend/dist/main*)",
+      "Bash(npx nest:*)",
+      "Bash(node -e \":*)",
+      "Bash(timeout 5 node dist/main)",
+      "Bash(find /Users/quantran/Work/ML/money-lab-backend/.claude/memory -path *invest-simulation*)"
+    ],
     "additionalDirectories": [
       "/Users/quantran/Work/ML/money-lab-backend/.claude/memory/domain/invest-simulation"
-    ],
-    "allow": [
-      "Bash(xargs perl:*)"
     ]
   }
 }

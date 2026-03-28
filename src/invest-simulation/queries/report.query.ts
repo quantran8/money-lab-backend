@@ -7,14 +7,14 @@ export class InvestReportQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findLatestReport(userId: string): Promise<SimReportRow | null> {
-    return this.prisma.investSimReport.findFirst({
+    return this.prisma.simReport.findFirst({
       where: { userId },
       orderBy: { generatedAt: 'desc' },
     });
   }
 
   async findReports(userId: string, limit: number = 10): Promise<SimReportRow[]> {
-    return this.prisma.investSimReport.findMany({
+    return this.prisma.simReport.findMany({
       where: { userId },
       orderBy: { generatedAt: 'desc' },
       take: limit,

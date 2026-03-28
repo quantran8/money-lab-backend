@@ -9,8 +9,8 @@ export type LifeEventTemplateRow = Prisma.LifeEventTemplateGetPayload<
 export type LifeEventTemplateWithOptionsRow =
   Prisma.LifeEventTemplateGetPayload<{ include: { options: true } }>;
 
-export type ModuleEventPoolWeightRow =
-  Prisma.ModuleEventPoolWeightGetPayload<Record<string, never>>;
+export type EventPoolWeightRow =
+  Prisma.EventPoolWeightGetPayload<Record<string, never>>;
 
 export type LifeEventOptionRow =
   Prisma.LifeEventOptionGetPayload<Record<string, never>>;

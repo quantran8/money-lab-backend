@@ -7,14 +7,14 @@ export class InvestBehaviorQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findOpenWindows(): Promise<BehaviorWindowRow[]> {
-    return this.prisma.investBehaviorWindow.findMany({
+    return this.prisma.behaviorWindow.findMany({
       where: { isOpen: true },
       orderBy: { startTickIndex: 'asc' },
     });
   }
 
   async findSnapshotsByUser(userId: string, limit: number = 10): Promise<BehaviorSnapshotRow[]> {
-    return this.prisma.investUserBehaviorSnapshot.findMany({
+    return this.prisma.userBehaviorSnapshot.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -22,7 +22,7 @@ export class InvestBehaviorQuery {
   }
 
   async findLatestStabilityMetric(userId: string): Promise<StabilityMetricRow | null> {
-    return this.prisma.investUserStabilityMetric.findFirst({
+    return this.prisma.userStabilityMetric.findFirst({
       where: { userId },
       orderBy: { tickIndex: 'desc' },
     });

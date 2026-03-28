@@ -1,3 +1,3 @@
 import { Prisma } from '@prisma/client';
 
-export type SimReportRow = Prisma.InvestSimReportGetPayload<Record<string, never>>;
+export type SimReportRow = Prisma.SimReportGetPayload<Record<string, never>>;

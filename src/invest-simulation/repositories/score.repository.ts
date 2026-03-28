@@ -17,7 +17,7 @@ export class InvestScoreRepository {
     wealthTier: string,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserScore.upsert({
+    return this.client(tx).userScore.upsert({
       where: { userId },
       update: { wealthPoints, stabilityFactor, wealthTier, lastCalculatedAt: new Date() },
       create: { userId, wealthPoints, stabilityFactor, wealthTier },

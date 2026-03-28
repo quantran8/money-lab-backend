@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
 import { InvestMarketQuery } from '../queries/market.query.js';
-import { InvestAssetQuery } from '../queries/asset.query.js';
+import { AssetQuery } from '../queries/asset.query.js';
 
 @Injectable()
 export class InvestMarketStateService {
@@ -9,7 +9,7 @@ export class InvestMarketStateService {
 
   constructor(
     private readonly marketQuery: InvestMarketQuery,
-    private readonly assetQuery: InvestAssetQuery,
+    private readonly assetQuery: AssetQuery,
   ) {}
 
   async getCurrentMarketState() {
@@ -18,7 +18,7 @@ export class InvestMarketStateService {
       if (!tick) throw new NotFoundException('No market ticks available');
 
       return {
-        tickIndex: tick.tickIndex,
+        tickIndex: Number(tick.tickIndex),
         simDay: tick.simDay,
         simMonth: tick.simMonth,
         simYear: tick.simYear,
@@ -34,7 +34,7 @@ export class InvestMarketStateService {
 
       const prices = await this.marketQuery.findLatestPrices(tick.id);
       return {
-        tickIndex: tick.tickIndex,
+        tickIndex: Number(tick.tickIndex),
         prices: prices.map((p) => ({
           assetId: p.assetId.toString(),
           price: p.price,

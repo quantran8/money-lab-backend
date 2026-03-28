@@ -4,11 +4,11 @@ import { InvestBehaviorQuery } from '../queries/behavior.query.js';
 import { InvestBehaviorRepository } from '../repositories/behavior.repository.js';
 
 /** Default window duration in ticks. */
-const DEFAULT_WINDOW_DURATION = 10;
+const DEFAULT_WINDOW_DURATION = 10n;
 
 @Injectable()
-export class InvestBehaviorWindowService {
-  private readonly logger = new Logger(InvestBehaviorWindowService.name);
+export class BehaviorWindowService {
+  private readonly logger = new Logger(BehaviorWindowService.name);
 
   constructor(
     private readonly behaviorQuery: InvestBehaviorQuery,
@@ -20,7 +20,7 @@ export class InvestBehaviorWindowService {
    * Called by tick service after state machine transitions.
    */
   async openWindowsForTick(
-    tickIndex: number,
+    tickIndex: bigint,
     spotlightTransitions: number,
     arcTransitions: number,
     policyTransitions: number,
@@ -71,7 +71,7 @@ export class InvestBehaviorWindowService {
    * Close windows that have exceeded their duration.
    * Returns IDs of closed windows for evaluation.
    */
-  async closeExpiredWindows(tickIndex: number, tx: TxClient): Promise<bigint[]> {
+  async closeExpiredWindows(tickIndex: bigint, tx: TxClient): Promise<bigint[]> {
     const openWindows = await this.behaviorQuery.findOpenWindows();
     const closedIds: bigint[] = [];
 

@@ -12,10 +12,10 @@ export class InvestSpotlightRepository {
   }
 
   async createInstance(
-    data: Prisma.InvestAssetSpotlightInstanceUncheckedCreateInput,
+    data: Prisma.AssetSpotlightInstanceUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investAssetSpotlightInstance.create({ data });
+    return this.client(tx).assetSpotlightInstance.create({ data });
   }
 
   async updateInstanceState(
@@ -24,14 +24,14 @@ export class InvestSpotlightRepository {
     ticksInCurrentState: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investAssetSpotlightInstance.update({
+    return this.client(tx).assetSpotlightInstance.update({
       where: { id },
       data: { state, ticksInCurrentState },
     });
   }
 
-  async deactivateInstance(id: bigint, endedAtTick: number, cooldownUntilTick: number, tx?: TxClient) {
-    return this.client(tx).investAssetSpotlightInstance.update({
+  async deactivateInstance(id: bigint, endedAtTick: bigint, cooldownUntilTick: bigint, tx?: TxClient) {
+    return this.client(tx).assetSpotlightInstance.update({
       where: { id },
       data: { isActive: false, endedAtTick, cooldownUntilTick },
     });

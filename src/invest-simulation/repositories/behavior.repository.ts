@@ -12,30 +12,30 @@ export class InvestBehaviorRepository {
   }
 
   async createWindow(
-    data: Prisma.InvestBehaviorWindowUncheckedCreateInput,
+    data: Prisma.BehaviorWindowUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investBehaviorWindow.create({ data });
+    return this.client(tx).behaviorWindow.create({ data });
   }
 
-  async closeWindow(id: bigint, endTickIndex: number, tx?: TxClient) {
-    return this.client(tx).investBehaviorWindow.update({
+  async closeWindow(id: bigint, endTickIndex: bigint, tx?: TxClient) {
+    return this.client(tx).behaviorWindow.update({
       where: { id },
       data: { isOpen: false, endTickIndex },
     });
   }
 
   async createSnapshot(
-    data: Prisma.InvestUserBehaviorSnapshotUncheckedCreateInput,
+    data: Prisma.UserBehaviorSnapshotUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserBehaviorSnapshot.create({ data });
+    return this.client(tx).userBehaviorSnapshot.create({ data });
   }
 
   async createStabilityMetric(
-    data: Prisma.InvestUserStabilityMetricUncheckedCreateInput,
+    data: Prisma.UserStabilityMetricUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserStabilityMetric.create({ data });
+    return this.client(tx).userStabilityMetric.create({ data });
   }
 }

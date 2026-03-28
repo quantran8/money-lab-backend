@@ -1,27 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { InvestMarketStateService } from './services/market-state.service.js';
-import { InvestAssetService } from './services/asset.service.js';
+import { AssetService } from './services/asset.service.js';
 import { InvestTradeService } from './services/trade.service.js';
 import { InvestPortfolioService } from './services/portfolio.service.js';
 import { InvestNewsService } from './services/news.service.js';
 import { InvestTickService } from './services/tick.service.js';
 import { InvestStabilityScoreService } from './services/stability-score.service.js';
 import { InvestReflectionService } from './services/reflection.service.js';
-import { InvestMissionService } from './services/mission.service.js';
+import { MissionService } from './services/mission.service.js';
 import { InvestReportService } from './services/report.service.js';
 
 @Injectable()
 export class InvestSimulationService {
   constructor(
     private readonly marketState: InvestMarketStateService,
-    private readonly asset: InvestAssetService,
+    private readonly asset: AssetService,
     private readonly trade: InvestTradeService,
     private readonly portfolio: InvestPortfolioService,
     private readonly news: InvestNewsService,
     private readonly tick: InvestTickService,
     private readonly stabilityScore: InvestStabilityScoreService,
     private readonly reflection: InvestReflectionService,
-    private readonly mission: InvestMissionService,
+    private readonly mission: MissionService,
     private readonly report: InvestReportService,
   ) {}
 
@@ -35,10 +35,20 @@ export class InvestSimulationService {
     return this.marketState.getLatestPrices();
   }
 
+  // ── Sectors ─────────────────────────────────────────────────────
+
+  async getSectors() {
+    return this.asset.getSectors();
+  }
+
   // ── Assets ───────────────────────────────────────────────────────
 
-  async getAssets() {
-    return this.asset.getAssetList();
+  async getAssets(
+    filter: { sectorId?: number; search?: string } = {},
+    limit?: number,
+    offset?: number,
+  ) {
+    return this.asset.getAssetList(filter, limit, offset);
   }
 
   async getAssetDetail(assetId: bigint) {
@@ -97,8 +107,8 @@ export class InvestSimulationService {
 
   async evaluateAllUsers() {
     // Use latest tick index
-    const tick = await this.marketState.getCurrentMarketState().catch(() => null);
-    const tickIndex = tick?.tickIndex ?? 0;
+    const state = await this.marketState.getCurrentMarketState().catch(() => null);
+    const tickIndex = BigInt(state?.tickIndex ?? 0);
     return this.stabilityScore.evaluateAllUsers(tickIndex);
   }
 

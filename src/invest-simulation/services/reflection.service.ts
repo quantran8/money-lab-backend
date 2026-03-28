@@ -26,7 +26,7 @@ export class InvestReflectionService {
       const reflections = await this.reflectionQuery.findUserReflections(userId);
       return reflections.map((r) => ({
         id: r.id.toString(),
-        tickIndex: r.tickIndex,
+        tickIndex: Number(r.tickIndex),
         templateTitle: r.template.title,
         reflectionText: r.reflectionText,
         createdAt: r.createdAt.toISOString(),
@@ -37,7 +37,7 @@ export class InvestReflectionService {
   /**
    * Generate reflections for a user based on their latest behavior snapshot.
    */
-  async generateForUser(userId: string, tickIndex: number): Promise<number> {
+  async generateForUser(userId: string, tickIndex: bigint): Promise<number> {
     const [templates, snapshots] = await Promise.all([
       this.reflectionQuery.findTemplates(),
       this.behaviorQuery.findSnapshotsByUser(userId, 1),

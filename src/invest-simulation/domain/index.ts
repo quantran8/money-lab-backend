@@ -2,6 +2,7 @@ export {
   computeBuyFill,
   computeSellFill,
   computeNewAvgPrice,
+  allowsFractionalQuantity,
 } from './trading/trade-executor.js';
 
 export type {

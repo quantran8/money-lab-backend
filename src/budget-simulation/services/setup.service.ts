@@ -3,7 +3,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { BudgetRunQuery } from '../queries/run.query';
+import { RunQuery } from '../queries/run.query';
 import { CommitmentQuery } from '../queries/commitment.query';
 import { CommitmentLayer } from '../budget-simulation.enum';
 
@@ -16,7 +16,7 @@ export class BudgetSimulationSetupService {
   private readonly logger = new Logger(BudgetSimulationSetupService.name);
 
   constructor(
-    private readonly runQuery: BudgetRunQuery,
+    private readonly runQuery: RunQuery,
     private readonly commitmentQuery: CommitmentQuery,
   ) {}
 

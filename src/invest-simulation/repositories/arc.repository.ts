@@ -12,10 +12,10 @@ export class InvestArcRepository {
   }
 
   async createInstance(
-    data: Prisma.InvestWorldArcInstanceUncheckedCreateInput,
+    data: Prisma.WorldArcInstanceUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investWorldArcInstance.create({ data });
+    return this.client(tx).worldArcInstance.create({ data });
   }
 
   async updateInstanceState(
@@ -25,14 +25,14 @@ export class InvestArcRepository {
     progress: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).investWorldArcInstance.update({
+    return this.client(tx).worldArcInstance.update({
       where: { id },
       data: { state, ticksInCurrentState, progress },
     });
   }
 
-  async deactivateInstance(id: bigint, endedAtTick: number, tx?: TxClient) {
-    return this.client(tx).investWorldArcInstance.update({
+  async deactivateInstance(id: bigint, endedAtTick: bigint, tx?: TxClient) {
+    return this.client(tx).worldArcInstance.update({
       where: { id },
       data: { isActive: false, endedAtTick },
     });

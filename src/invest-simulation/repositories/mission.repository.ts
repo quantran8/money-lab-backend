@@ -4,7 +4,7 @@ import { PrismaService } from '#app/prisma/prisma.service.js';
 import { TxClient } from '#app/prisma/transaction.runner.js';
 
 @Injectable()
-export class InvestMissionRepository {
+export class MissionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private client(tx?: TxClient) {
@@ -12,10 +12,10 @@ export class InvestMissionRepository {
   }
 
   async createUserMission(
-    data: Prisma.InvestUserMissionUncheckedCreateInput,
+    data: Prisma.UserMissionUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserMission.create({ data });
+    return this.client(tx).userMission.create({ data });
   }
 
   async updateMissionStatus(
@@ -24,7 +24,7 @@ export class InvestMissionRepository {
     status: string,
     tx?: TxClient,
   ) {
-    return this.client(tx).investUserMission.update({
+    return this.client(tx).userMission.update({
       where: { userId_missionId: { userId, missionId } },
       data: {
         status,

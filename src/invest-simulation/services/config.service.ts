@@ -7,7 +7,7 @@ export class InvestConfigService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSectors(): Promise<SectorRow[]> {
-    return this.prisma.investSector.findMany({
+    return this.prisma.sector.findMany({
       orderBy: { sortOrder: 'asc' },
     });
   }

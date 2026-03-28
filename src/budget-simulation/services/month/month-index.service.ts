@@ -53,8 +53,8 @@ export class MonthIndexService {
     const hiStart = Number(ir.hiEnd ?? ir.hiStart ?? DEFAULT_HI_START);
     const lqiStart = Number(ir.lqiEnd ?? ir.lqiStart ?? DEFAULT_LQI_START);
 
-    const jobLevel = month.budgetRun?.jobState?.job?.levels.find(
-      (l) => l.level === month.budgetRun?.jobState?.level,
+    const jobLevel = month.run?.jobState?.job?.levels.find(
+      (l) => l.level === month.run?.jobState?.level,
     );
     const weeklyJobDrain = Math.round(jobLevel?.baseEnergyLoadOverride ?? 0);
 

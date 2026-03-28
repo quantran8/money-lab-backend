@@ -23,7 +23,7 @@ export class InvestBehaviorEvaluationService {
     if (closedWindowIds.length === 0) return 0;
 
     // Fetch window details
-    const windows = await this.prisma.investBehaviorWindow.findMany({
+    const windows = await this.prisma.behaviorWindow.findMany({
       where: { id: { in: closedWindowIds } },
     });
 
@@ -33,7 +33,7 @@ export class InvestBehaviorEvaluationService {
       if (window.endTickIndex == null) continue;
 
       // Bulk fetch: all transactions during this window across all users
-      const transactions = await this.prisma.investPortfolioTransaction.findMany({
+      const transactions = await this.prisma.portfolioTransaction.findMany({
         where: {
           createdAt: { gte: window.createdAt },
         },
@@ -43,7 +43,7 @@ export class InvestBehaviorEvaluationService {
       const userIds = [...new Set(transactions.map((t) => t.userId))];
 
       // Fetch news tick IDs during the window
-      const newsItems = await this.prisma.investSimNewsItem.findMany({
+      const newsItems = await this.prisma.simNewsItem.findMany({
         where: {
           tick: {
             tickIndex: {
@@ -60,7 +60,7 @@ export class InvestBehaviorEvaluationService {
         const userTxns = transactions.filter((t) => t.userId === userId);
 
         // Simplified: use positions at evaluation time
-        const positions = await this.prisma.investPortfolioPosition.findMany({
+        const positions = await this.prisma.portfolioPosition.findMany({
           where: { userId, quantity: { gt: 0 } },
           include: { asset: { include: { sector: true } } },
         });
@@ -90,7 +90,7 @@ export class InvestBehaviorEvaluationService {
           positionsStart: positionsMap,
           positionsEnd: positionsMap,
           newsTickIds,
-          windowDurationTicks: window.endTickIndex - window.startTickIndex,
+          windowDurationTicks: Number(window.endTickIndex - window.startTickIndex),
         };
 
         const metrics = computeBehaviorMetrics(input);

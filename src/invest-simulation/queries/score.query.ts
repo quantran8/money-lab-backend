@@ -7,7 +7,7 @@ export class InvestScoreQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   async findUserScore(userId: string): Promise<UserScoreRow | null> {
-    return this.prisma.investUserScore.findUnique({
+    return this.prisma.userScore.findUnique({
       where: { userId },
     });
   }

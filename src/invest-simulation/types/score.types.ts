@@ -1,3 +1,3 @@
 import { Prisma } from '@prisma/client';
 
-export type UserScoreRow = Prisma.InvestUserScoreGetPayload<Record<string, never>>;
+export type UserScoreRow = Prisma.UserScoreGetPayload<Record<string, never>>;

@@ -16,18 +16,18 @@ export class BudgetMonthRepository {
   }
 
   async createMonth(
-    data: Prisma.BudgetRunMonthUncheckedCreateInput,
+    data: Prisma.RunMonthUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetRunMonth.create({ data });
+    return this.client(tx).runMonth.create({ data });
   }
 
   async updateMonth(
     monthId: bigint,
-    data: Prisma.BudgetRunMonthUpdateInput,
+    data: Prisma.RunMonthUpdateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetRunMonth.update({
+    return this.client(tx).runMonth.update({
       where: { id: monthId },
       data,
     });
@@ -41,7 +41,7 @@ export class BudgetMonthRepository {
     overtimeIncomeDelta: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetRunMonth.update({
+    return this.client(tx).runMonth.update({
       where: { id: monthId },
       data: {
         acceptedOvertimeCount: { increment: 1 },
@@ -51,37 +51,37 @@ export class BudgetMonthRepository {
   }
 
   async createBillResolution(
-    data: Prisma.BudgetMonthBillResolutionUncheckedCreateInput,
+    data: Prisma.MonthBillResolutionUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthBillResolution.create({ data });
+    return this.client(tx).monthBillResolution.create({ data });
   }
 
   async updateBillResolution(
-    budgetMonthId: bigint,
-    data: Prisma.BudgetMonthBillResolutionUpdateInput,
+    monthId: bigint,
+    data: Prisma.MonthBillResolutionUpdateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthBillResolution.update({
-      where: { budgetMonthId },
+    return this.client(tx).monthBillResolution.update({
+      where: { monthId },
       data,
     });
   }
 
   async createIndexResolution(
-    data: Prisma.BudgetMonthIndexResolutionUncheckedCreateInput,
+    data: Prisma.MonthIndexResolutionUncheckedCreateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthIndexResolution.create({ data });
+    return this.client(tx).monthIndexResolution.create({ data });
   }
 
   async updateIndexResolution(
-    budgetMonthId: bigint,
-    data: Prisma.BudgetMonthIndexResolutionUpdateInput,
+    monthId: bigint,
+    data: Prisma.MonthIndexResolutionUpdateInput,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthIndexResolution.update({
-      where: { budgetMonthId },
+    return this.client(tx).monthIndexResolution.update({
+      where: { monthId },
       data,
     });
   }
@@ -92,13 +92,13 @@ export class BudgetMonthRepository {
     allocatedAmount: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthJar.upsert({
+    return this.client(tx).monthJar.upsert({
       where: {
-        budgetMonthId_jarCode: { budgetMonthId: monthId, jarCode },
+        monthId_jarCode: { monthId: monthId, jarCode },
       },
       update: { allocatedAmount },
       create: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         jarCode,
         allocatedAmount,
         spentAmount: 0,
@@ -110,13 +110,13 @@ export class BudgetMonthRepository {
   }
 
   async ensureJarExists(monthId: bigint, jarCode: string, tx?: TxClient) {
-    return this.client(tx).budgetMonthJar.upsert({
+    return this.client(tx).monthJar.upsert({
       where: {
-        budgetMonthId_jarCode: { budgetMonthId: monthId, jarCode },
+        monthId_jarCode: { monthId: monthId, jarCode },
       },
       update: {},
       create: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         jarCode,
         allocatedAmount: 0,
         spentAmount: 0,
@@ -135,9 +135,9 @@ export class BudgetMonthRepository {
     overflowOut: number,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthJar.upsert({
+    return this.client(tx).monthJar.upsert({
       where: {
-        budgetMonthId_jarCode: { budgetMonthId: monthId, jarCode },
+        monthId_jarCode: { monthId: monthId, jarCode },
       },
       update: {
         spentAmount: { increment: spent },
@@ -145,7 +145,7 @@ export class BudgetMonthRepository {
         overflowOutAmount: { increment: overflowOut },
       },
       create: {
-        budgetMonthId: monthId,
+        monthId: monthId,
         jarCode,
         allocatedAmount: 0,
         spentAmount: spent,
@@ -166,9 +166,17 @@ export class BudgetMonthRepository {
       where: { id: eventTemplateId },
       select: { eventSource: true, eventSubtype: true },
     });
-    return this.client(tx).budgetMonthEvent.create({
-      data: {
-        budgetMonthId: monthId,
+    return this.client(tx).monthEvent.upsert({
+      where: {
+        monthId_week_eventSource: {
+          monthId,
+          week,
+          eventSource: template.eventSource,
+        },
+      },
+      update: {},
+      create: {
+        monthId,
         eventTemplateId,
         week,
         eventSource: template.eventSource,
@@ -188,14 +196,14 @@ export class BudgetMonthRepository {
     paymentBreakdown: Prisma.InputJsonValue,
     tx?: TxClient,
   ) {
-    return this.client(tx).budgetMonthEvent.update({
+    return this.client(tx).monthEvent.update({
       where: { id: eventId },
       data: { chosenOptionId, paymentBreakdown },
     });
   }
 
   async updateWeeklyIndexProgress(
-    budgetMonthId: bigint,
+    monthId: bigint,
     week: number,
     payload: Record<string, unknown>,
     tx?: TxClient,
@@ -204,12 +212,12 @@ export class BudgetMonthRepository {
 
     return client.$executeRawUnsafe(
       `
-    UPDATE budget_month_index_resolution
+    UPDATE budget.month_index_resolution
     SET weekly_index_progress =
       COALESCE(weekly_index_progress, '{}'::jsonb) || jsonb_build_object($2, $3::jsonb)
-    WHERE budget_month_id = $1
+    WHERE month_id = $1
     `,
-      budgetMonthId,
+      monthId,
       `week${week}`,
       JSON.stringify(payload),
     );

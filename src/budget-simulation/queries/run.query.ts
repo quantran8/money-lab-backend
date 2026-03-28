@@ -13,10 +13,10 @@ import type {
 
 /**
  * Read-only data access for budget runs, jobs, and user job state.
- * Write operations are in BudgetRunRepository.
+ * Write operations are in RunRepository.
  */
 @Injectable()
-export class BudgetRunQuery {
+export class RunQuery {
   constructor(private readonly prisma: PrismaService) {}
 
   /** All jobs (for setup options). */
@@ -38,7 +38,7 @@ export class BudgetRunQuery {
   async findActiveRunWithDetails(
     userId: string,
   ): Promise<ActiveRunWithDetailsRow | null> {
-    return this.prisma.budgetRun.findFirst({
+    return this.prisma.run.findFirst({
       where: { userId },
       orderBy: { startedAt: 'desc' },
       include: {
@@ -66,7 +66,7 @@ export class BudgetRunQuery {
   async findRunWithJobState(
     runId: bigint,
   ): Promise<RunWithJobStateRow | null> {
-    return this.prisma.budgetRun.findUnique({
+    return this.prisma.run.findUnique({
       where: { id: runId },
       include: {
         jobState: { include: { job: { include: { levels: true } } } },
@@ -78,7 +78,7 @@ export class BudgetRunQuery {
   async findRunWithLatestMonthAndCommitments(
     runId: bigint,
   ): Promise<RunWithLatestMonthAndCommitmentsRow | null> {
-    return this.prisma.budgetRun.findUnique({
+    return this.prisma.run.findUnique({
       where: { id: runId },
       include: {
         jobState: {
@@ -104,7 +104,7 @@ export class BudgetRunQuery {
   async findRunWithAllMonths(
     runId: bigint,
   ): Promise<RunWithAllMonthsRow | null> {
-    return this.prisma.budgetRun.findUnique({
+    return this.prisma.run.findUnique({
       where: { id: runId },
       include: {
         jobState: {
@@ -140,7 +140,7 @@ export class BudgetRunQuery {
     runId: bigint,
   ): Promise<UserRunCommitmentWithTemplateRow[]> {
     return this.prisma.userRunCommitment.findMany({
-      where: { budgetRunId: runId },
+      where: { runId: runId },
       include: { template: true },
     });
   }
@@ -156,7 +156,7 @@ export class BudgetRunQuery {
   ): Promise<UserRunCommitmentWithTemplateRow[]> {
     return this.prisma.userRunCommitment.findMany({
       where: {
-        budgetRunId: runId,
+        runId: runId,
         effectiveFromMonthIndex: { lte: monthIndex },
         OR: [
           { effectiveToMonthIndex: null },

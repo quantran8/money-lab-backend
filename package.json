@@ -6,9 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "imports": {
-    "#app/*": "./src/*",
-    "#budget-simulation/*": "./src/budget-simulation/*",
-    "#common/*": "./src/common/*"
+    "#app/*": "./dist/*",
+    "#budget-simulation/*": "./dist/budget-simulation/*",
+    "#common/*": "./dist/common/*"
   },
   "scripts": {
     "build": "nest build",

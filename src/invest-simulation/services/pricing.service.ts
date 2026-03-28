@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TxClient } from '#app/prisma/transaction.runner.js';
-import { InvestAssetQuery } from '../queries/asset.query.js';
+import { AssetQuery } from '../queries/asset.query.js';
 import { InvestMarketQuery } from '../queries/market.query.js';
 import { InvestMarketRepository } from '../repositories/market.repository.js';
 import {
@@ -13,7 +13,7 @@ export class InvestPricingService {
   private readonly logger = new Logger(InvestPricingService.name);
 
   constructor(
-    private readonly assetQuery: InvestAssetQuery,
+    private readonly assetQuery: AssetQuery,
     private readonly marketQuery: InvestMarketQuery,
     private readonly marketRepo: InvestMarketRepository,
   ) {}
@@ -24,7 +24,7 @@ export class InvestPricingService {
    */
   async generatePricesForTick(
     tickId: bigint,
-    tickIndex: number,
+    tickIndex: bigint,
     spotlightAssetImpacts: Record<string, number>,
     arcGlobalImpact: number,
     policyGlobalImpact: number,
