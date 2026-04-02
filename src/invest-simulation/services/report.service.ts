@@ -51,7 +51,13 @@ export class InvestReportService {
   /**
    * Generate a report for a user at the current tick.
    */
-  async generateForUser(userId: string, tickIndex: bigint, simDay: number, simMonth: number, simYear: number): Promise<void> {
+  async generateForUser(
+    userId: string,
+    tickIndex: bigint,
+    simDay: number,
+    simMonth: number,
+    simYear: number,
+  ): Promise<void> {
     const [positions, tick, stability, reflections] = await Promise.all([
       this.portfolioQuery.findPositionsWithAsset(userId),
       this.marketQuery.findCurrentTick(),
@@ -60,7 +66,7 @@ export class InvestReportService {
     ]);
 
     // Build price map
-    let priceMap: PriceMap = {};
+    const priceMap: PriceMap = {};
     if (tick) {
       const prices = await this.marketQuery.findLatestPrices(tick.id);
       for (const p of prices) {
@@ -76,7 +82,11 @@ export class InvestReportService {
       assetType: p.asset.assetType,
     }));
 
-    const sectorExposureArr = calculateExposure(posInputs, priceMap, 'sectorCode');
+    const sectorExposureArr = calculateExposure(
+      posInputs,
+      priceMap,
+      'sectorCode',
+    );
     const typeExposureArr = calculateExposure(posInputs, priceMap, 'assetType');
 
     const sectorExposure: Record<string, number> = {};

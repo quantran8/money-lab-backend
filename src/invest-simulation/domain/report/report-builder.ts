@@ -20,9 +20,10 @@ export interface ReportData {
 }
 
 export function buildReport(input: ReportInput): ReportData {
-  const reflectionSummary = input.recentReflections.length > 0
-    ? input.recentReflections.slice(0, 3).join(' | ')
-    : 'No reflections in this period.';
+  const reflectionSummary =
+    input.recentReflections.length > 0
+      ? input.recentReflections.slice(0, 3).join(' | ')
+      : 'No reflections in this period.';
 
   return {
     sectorExposure: input.sectorExposure,

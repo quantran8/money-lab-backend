@@ -71,7 +71,10 @@ export class BehaviorWindowService {
    * Close windows that have exceeded their duration.
    * Returns IDs of closed windows for evaluation.
    */
-  async closeExpiredWindows(tickIndex: bigint, tx: TxClient): Promise<bigint[]> {
+  async closeExpiredWindows(
+    tickIndex: bigint,
+    tx: TxClient,
+  ): Promise<bigint[]> {
     const openWindows = await this.behaviorQuery.findOpenWindows();
     const closedIds: bigint[] = [];
 

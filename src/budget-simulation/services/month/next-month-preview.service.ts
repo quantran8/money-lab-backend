@@ -40,8 +40,7 @@ export class NextMonthPreviewService {
     );
     const absenceDeduction =
       month.indexResolution?.incomeLossFromForcedRest ?? 0;
-    const grossNextMonthIncome =
-      resolvedBase + overtimeCarriedFromPriorMonth;
+    const grossNextMonthIncome = resolvedBase + overtimeCarriedFromPriorMonth;
     const finalIncome = grossNextMonthIncome - absenceDeduction;
 
     const lockedTotal = nextMonthCommitments

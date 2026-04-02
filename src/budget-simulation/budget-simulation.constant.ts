@@ -32,8 +32,7 @@ export const BILL_RESERVE_OPTIONS = [
 /** Returns bill reserve coverage percentage for a given option code. */
 export function getBillReserveCoveragePct(code: string): number {
   const option = BILL_RESERVE_OPTIONS.find((x) => x.code === code);
-  if (!option)
-    throw new Error(`Invalid bill_reserve_option_code: ${code}`);
+  if (!option) throw new Error(`Invalid bill_reserve_option_code: ${code}`);
   return option.coveragePct;
 }
 

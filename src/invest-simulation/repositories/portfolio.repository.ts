@@ -52,11 +52,7 @@ export class InvestPortfolioRepository {
     });
   }
 
-  async deletePositionIfEmpty(
-    userId: string,
-    assetId: bigint,
-    tx?: TxClient,
-  ) {
+  async deletePositionIfEmpty(userId: string, assetId: bigint, tx?: TxClient) {
     await this.client(tx).portfolioPosition.deleteMany({
       where: { userId, assetId, quantity: { lte: 0 } },
     });

@@ -55,7 +55,10 @@ export function chooseTemplate(
   seed: string,
   templates: EventTemplateRef[],
 ): bigint {
-  const totalWeight = templates.reduce((sum, t) => sum + (RARITY_WEIGHT_BASE - t.rarity), 0);
+  const totalWeight = templates.reduce(
+    (sum, t) => sum + (RARITY_WEIGHT_BASE - t.rarity),
+    0,
+  );
   const roll = deterministicRandom(seed) * totalWeight;
   let runningWeight = 0;
   for (const t of templates) {
@@ -90,9 +93,10 @@ function cheapestOptionCost(options: EventOptionCost[]): number {
  * Filters templates so the cheapest option cost <= totalAvailableFunds.
  * If none are affordable, falls back to templates that have a zero-cost option.
  */
-export function filterAffordableTemplates<
-  T extends TemplateWithOptions,
->(templates: T[], totalAvailableFunds: number): T[] {
+export function filterAffordableTemplates<T extends TemplateWithOptions>(
+  templates: T[],
+  totalAvailableFunds: number,
+): T[] {
   const affordable = templates.filter(
     (t) => cheapestOptionCost(t.options) <= totalAvailableFunds,
   );

@@ -54,14 +54,8 @@ export function computeBills(
  * Does not persist; service applies jarChanges and updates month/billResolution.
  */
 export function reconcile(input: BillsInput): BillsResult {
-  const {
-    billsEstimated,
-    billReserveEnd,
-    freeCash,
-    jars,
-    actual,
-    reason,
-  } = input;
+  const { billsEstimated, billReserveEnd, freeCash, jars, actual, reason } =
+    input;
 
   const delta = actual - billsEstimated;
   const breakdown: Record<string, number | string | null> = {};

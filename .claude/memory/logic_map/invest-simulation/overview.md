@@ -26,6 +26,8 @@ InvestController → InvestSimulationService (facade)
       → InvestPricingService (generation)
       → InvestBehaviorWindowService (open/close)
       → InvestBehaviorEvaluationService (snapshot)
+
+InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
 ```
 
 ## API Endpoints
@@ -125,6 +127,8 @@ InvestController → InvestSimulationService (facade)
 - `services/pricing.service.ts` — InvestPricingService (price generation)
 - `services/news.service.ts` — InvestNewsService (news CRUD + generation)
 - `services/tick.service.ts` — InvestTickService (master tick orchestrator)
+- `services/tick-scheduler.service.ts` — InvestTickScheduler (cron: every 6h auto-tick)
+- `services/spawn.service.ts` — InvestSpawnService (auto-spawn spotlights, arcs, policies)
 
 ## Tick Flow (runTick)
 
@@ -132,24 +136,27 @@ InvestController → InvestSimulationService (facade)
 2. **WRITE** (single tx):
    a. Create market tick record
    b. Advance spotlights → transition events + asset impacts
-   c. Advance arcs → transition events + global impact
-   d. Advance policies → transition events + global policy impact
-   e. Generate news from all transitions → sector impacts
-   f. Generate prices from combined impacts (sector + spotlight + arc + policy + noise)
-   g. Open behavior windows from transitions
-   h. Close expired windows + evaluate user behavior → snapshots
-   i. Create world state snapshot
+   c. Advance arcs → transition events + per-asset impacts (magnitude × sector/category weight) + remainingActiveCount
+   d. Advance policies → transition events + per-asset impacts (magnitude × sector/category weight) + remainingActiveCount
+   e. Auto-spawn: arc-driven spotlights, arc respawn, policy respawn → spawn events + impacts
+   f. Merge advance + spawn events
+   g. Generate news from all transitions → sector impacts
+   h. Generate prices from combined impacts (sector + spotlight + arc per-asset + policy per-asset + noise)
+   i. Open behavior windows from transitions
+   j. Close expired windows + evaluate user behavior → snapshots
+   k. Create world state snapshot
 
 ### Phase 2 Domain (pure, no I/O)
 - `domain/pricing/price-generator.ts` — generatePrice, generateTickPrices, combineImpacts
 - `domain/news/news-generator.ts` — generateNewsFromTransitions
 - `domain/state-machines/asset-spotlight.ts` — transitionSpotlight, spotlightPriceMultiplier (6-state FSM)
 - `domain/state-machines/world-arc.ts` — transitionArc, arcImpactMultiplier (5-state FSM)
+- `domain/state-machines/spawn-engine.ts` — selectSpotlightAssets, selectSpotlightTemplate, selectArcType, selectPolicyTemplate, filterArcCandidatesByCooldown
 
 ### Phase 2 Types
 - `types/news.types.ts` — NewsItemRow, NewsWithImpactsRow
 - `types/spotlight.types.ts` — SpotlightInstanceRow, SpotlightInstanceFullRow
-- `types/arc.types.ts` — ArcInstanceRow, ArcInstanceWithTypeRow
+- `types/arc.types.ts` — ArcInstanceRow, ArcInstanceWithTypeRow, ArcSpotlightTemplateRow, ArcAssetAffinityRow
 
 ### Phase 2 Queries
 - `queries/news.query.ts` — InvestNewsQuery
@@ -162,13 +169,13 @@ InvestController → InvestSimulationService (facade)
 - `repositories/arc.repository.ts` — InvestArcRepository
 
 ### Phase 3 Domain (pure, no I/O)
-- `domain/state-machines/policy-thread.ts` — transitionPolicy, policyPriceMultiplier (6-state FSM)
+- `domain/state-machines/policy-thread.ts` — transitionPolicy, computePolicyAssetImpacts, policyPriceMultiplier (deprecated) (6-state FSM)
 - `domain/behavior/behavior-metrics.ts` — computeBehaviorMetrics (turnover, reaction, concentration, chasing)
 - `domain/behavior/stability-calculator.ts` — computeStabilityFactor (diversification + patience - penalties)
 - `domain/behavior/score-calculator.ts` — computeScore (wealthPoints = value × stability, tier)
 
 ### Phase 3 Types
-- `types/policy.types.ts` — PolicyInstanceRow, PolicyInstanceWithTemplateRow
+- `types/policy.types.ts` — PolicyInstanceRow, PolicyInstanceWithTemplateRow, PolicySectorImpactRow, PolicyInstanceWithTemplateAndImpactsRow
 - `types/behavior.types.ts` — BehaviorWindowRow, BehaviorSnapshotRow, StabilityMetricRow
 - `types/score.types.ts` — UserScoreRow
 
@@ -183,7 +190,7 @@ InvestController → InvestSimulationService (facade)
 - `repositories/score.repository.ts` — InvestScoreRepository
 
 ### Phase 3 Services
-- `services/policy.service.ts` — InvestPolicyService (FSM advancement, integrated into tick)
+- `services/policy.service.ts` — InvestPolicyService (FSM advancement, per-asset impacts via PolicySectorImpact, integrated into tick)
 - `services/behavior-window.service.ts` — InvestBehaviorWindowService (open/close windows)
 - `services/behavior-evaluation.service.ts` — InvestBehaviorEvaluationService (evaluate users per window)
 - `services/stability-score.service.ts` — InvestStabilityScoreService (recalculate stability + score, read APIs)

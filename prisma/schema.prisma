@@ -6,41 +6,41 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["public", "budget", "invest"]
+  schemas  = ["budget", "invest", "public"]
 }
 
 model AppUser {
-  id                   String                 @id @db.Uuid
-  email                String?                @unique
-  username             String?                @unique
-  region               String?
-  avatar               String?
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
-  userLessonProgress    UserLessonProgress[]
-  moduleProgresses      UserModuleProgress[]
+  id                    String                 @id @db.Uuid
+  email                 String?                @unique
+  username              String?                @unique
+  region                String?
+  avatar                String?
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at            DateTime               @default(now()) @db.Timestamptz(6)
   runs                  Run[]
   jobStates             UserJobState[]
-  credits               UserCredit?
   portfolioPositions    PortfolioPosition[]
   portfolioTransactions PortfolioTransaction[]
+  credits               UserCredit?
+  userLessonProgress    UserLessonProgress[]
+  moduleProgresses      UserModuleProgress[]
 
   @@map("app_user")
   @@schema("public")
 }
 
 model Module {
-  id                  Int                     @id @default(autoincrement()) @db.SmallInt
-  code                String                  @unique
+  id                  Int                  @id @default(autoincrement()) @db.SmallInt
+  code                String               @unique
   title               String
   description         String?
-  sortOrder           Int                     @default(0) @map("sort_order") @db.SmallInt
-  config              Json                    @default("{}")
-  runs          Run[]
+  sortOrder           Int                  @default(0) @map("sort_order") @db.SmallInt
+  config              Json                 @default("{}")
   commitmentTemplates CommitmentTemplate[]
-  lessons             Lesson[]
-  lifeEventTemplates  LifeEventTemplate[]
   eventPoolWeights    EventPoolWeight[]
+  lifeEventTemplates  LifeEventTemplate[]
+  runs                Run[]
+  lessons             Lesson[]
   userProgresses      UserModuleProgress[]
 
   @@map("modules")
@@ -66,18 +66,16 @@ model UserModuleProgress {
   @@schema("public")
 }
 
-///----------module 1 Learning path-----------------
-
 model Lesson {
-  id                   BigInt                 @id @default(autoincrement())
-  moduleId             Int                    @map("module_id") @db.SmallInt
-  title                String
-  lessonType           String                 @map("lesson_type")
-  orderIndex           Int                    @default(0) @map("order_index")
-  estimatedSeconds     Int                    @default(0) @map("estimated_seconds")
-  content              Json                   @default("{}")
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  module               Module                 @relation(fields: [moduleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 BigInt               @id @default(autoincrement())
+  moduleId           Int                  @map("module_id") @db.SmallInt
+  title              String
+  lessonType         String               @map("lesson_type")
+  orderIndex         Int                  @default(0) @map("order_index")
+  estimatedSeconds   Int                  @default(0) @map("estimated_seconds")
+  content            Json                 @default("{}")
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  module             Module               @relation(fields: [moduleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   userLessonProgress UserLessonProgress[]
 
   @@index([moduleId, orderIndex], map: "idx_lessons_module_order")
@@ -85,19 +83,18 @@ model Lesson {
   @@schema("public")
 }
 
-
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model UserLessonProgress {
-  id              BigInt    @id @default(autoincrement())
-  userId          String    @db.Uuid @map("user_id")
-  lessonId        BigInt    @map("lesson_id")
-  status          String    @default("not_started")
-  bestScore       Int?      @map("best_score")
-  lastAttemptAt   DateTime? @db.Timestamptz(6) @map("last_attempt_at")
-  createdAt       DateTime  @default(now()) @db.Timestamptz(6)  @map("created_at")
-  updatedAt       DateTime  @default(now()) @db.Timestamptz(6)  @map("updated_at")
-  lessons         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  appUser         AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id            BigInt    @id @default(autoincrement())
+  userId        String    @map("user_id") @db.Uuid
+  lessonId      BigInt    @map("lesson_id")
+  status        String    @default("not_started")
+  bestScore     Int?      @map("best_score")
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  lessons       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  appUser       AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, lessonId])
   @@index([lessonId], map: "idx_ulp_lesson")
@@ -105,8 +102,6 @@ model UserLessonProgress {
   @@map("user_lesson_progress")
   @@schema("public")
 }
-
-/// -------------module 2 budget-simulation--------------
 
 model EventPoolWeight {
   id            BigInt  @id @default(autoincrement())
@@ -168,18 +163,18 @@ model JobLevel {
 }
 
 model UserJobState {
-  id                   BigInt      @id @default(autoincrement())
-  userId               String      @map("user_id") @db.Uuid
-  jobId                BigInt      @map("job_id")
-  level                Int         @default(1)
-  xp                   Int         @default(0)
-  currentMonthlyIncome Int         @default(0) @map("current_monthly_income")
-  isActive             Boolean     @default(true) @map("is_active")
-  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   BigInt   @id @default(autoincrement())
+  userId               String   @map("user_id") @db.Uuid
+  jobId                BigInt   @map("job_id")
+  level                Int      @default(1)
+  xp                   Int      @default(0)
+  currentMonthlyIncome Int      @default(0) @map("current_monthly_income")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   runs                 Run[]
-  job                  Job         @relation(fields: [jobId], references: [id], onUpdate: NoAction)
-  user                 AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  job                  Job      @relation(fields: [jobId], references: [id], onUpdate: NoAction)
+  user                 AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([jobId], map: "idx_user_job_state_job")
   @@index([userId], map: "idx_user_job_state_user")
@@ -242,8 +237,8 @@ model UserRunCommitment {
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   effectiveFromMonthIndex Int                @default(1) @map("effective_from_month_index")
   effectiveToMonthIndex   Int?               @map("effective_to_month_index")
-  run                     Run                @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   template                CommitmentTemplate @relation(fields: [commitmentTemplateId], references: [id], onUpdate: NoAction)
+  run                     Run                @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([runId, commitmentTemplateId])
   @@index([runId], map: "idx_user_run_commitments_run")
@@ -256,28 +251,28 @@ model UserRunCommitment {
 }
 
 model RunMonth {
-  id                               BigInt                      @id @default(autoincrement())
-  runId                            BigInt                      @map("run_id")
-  monthIndex                       Int                         @map("month_index")
-  income                           Int                         @default(0)
-  lockedCommitmentsTotal           Int                         @default(0) @map("locked_commitments_total")
-  billsEstimated                   Int                         @default(0) @map("bills_estimated")
-  billsActual                      Int?                        @default(0) @map("bills_actual")
-  cumulativeFutureYou              Int                         @default(0) @map("cumulative_future_you")
-  createdAt                        DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-  currentWeek                      Int                         @default(0) @map("current_week") @db.SmallInt
-  billReserveOptionCode            String?                     @map("bill_reserve_option_code")
-  spendModeCode                    String?                     @map("spend_mode_code")
-  structuralOvercommitmentOccurred Boolean                     @default(false) @map("structural_overcommitment_occurred")
-  stressModeActive                 Boolean                     @default(false) @map("stress_mode_active")
-  freeCash                         Float                       @default(0) @map("free_cash")
-  acceptedOvertimeCount            Int                         @default(0) @map("accepted_overtime_count")
-  overtimeIncomeEarned             Int                         @default(0) @map("overtime_income_earned")
+  id                               BigInt                @id @default(autoincrement())
+  runId                            BigInt                @map("run_id")
+  monthIndex                       Int                   @map("month_index")
+  income                           Int                   @default(0)
+  lockedCommitmentsTotal           Int                   @default(0) @map("locked_commitments_total")
+  billsEstimated                   Int                   @default(0) @map("bills_estimated")
+  billsActual                      Int?                  @default(0) @map("bills_actual")
+  cumulativeFutureYou              Int                   @default(0) @map("cumulative_future_you")
+  createdAt                        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  currentWeek                      Int                   @default(0) @map("current_week") @db.SmallInt
+  billReserveOptionCode            String?               @map("bill_reserve_option_code")
+  spendModeCode                    String?               @map("spend_mode_code")
+  structuralOvercommitmentOccurred Boolean               @default(false) @map("structural_overcommitment_occurred")
+  stressModeActive                 Boolean               @default(false) @map("stress_mode_active")
+  freeCash                         Float                 @default(0) @map("free_cash")
+  acceptedOvertimeCount            Int                   @default(0) @map("accepted_overtime_count")
+  overtimeIncomeEarned             Int                   @default(0) @map("overtime_income_earned")
   billResolution                   MonthBillResolution?
   events                           MonthEvent[]
   indexResolution                  MonthIndexResolution?
   jars                             MonthJar[]
-  run                              Run                         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  run                              Run                   @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([runId, monthIndex])
   @@index([runId], map: "idx_run_months_run")
@@ -286,16 +281,16 @@ model RunMonth {
 }
 
 model MonthBillResolution {
-  id                     BigInt         @id @default(autoincrement())
-  monthId                BigInt         @unique @map("month_id")
-  billReserveTarget      Int?           @map("bill_reserve_target")
-  billReserveStart       Int?           @map("bill_reserve_start")
-  billReserveEnd         Int?           @map("bill_reserve_end")
-  billReconcileBreakdown Json?          @map("bill_reconcile_breakdown")
-  shortfallTotal         Int?           @map("shortfall_total")
-  surplusToFreeCash      Int?           @map("surplus_to_free_cash")
-  createdAt              DateTime?      @default(now()) @map("created_at") @db.Timestamptz(6)
-  month                  RunMonth @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                     BigInt    @id @default(autoincrement())
+  monthId                BigInt    @unique @map("month_id")
+  billReserveTarget      Int?      @map("bill_reserve_target")
+  billReserveStart       Int?      @map("bill_reserve_start")
+  billReserveEnd         Int?      @map("bill_reserve_end")
+  billReconcileBreakdown Json?     @map("bill_reconcile_breakdown")
+  shortfallTotal         Int?      @map("shortfall_total")
+  surplusToFreeCash      Int?      @map("surplus_to_free_cash")
+  createdAt              DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  month                  RunMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([monthId], map: "idx_month_bill_resolution_month")
   @@map("month_bill_resolution")
@@ -303,29 +298,29 @@ model MonthBillResolution {
 }
 
 model MonthIndexResolution {
-  id                            BigInt         @id @default(autoincrement())
-  monthId                       BigInt         @unique @map("month_id")
-  hiStart                       Int?           @map("hi_start") @db.SmallInt
-  hiEnd                         Int?           @map("hi_end") @db.SmallInt
-  lqiStart                      Int?           @map("lqi_start") @db.SmallInt
-  lqiEnd                        Int?           @map("lqi_end") @db.SmallInt
-  lqiStateStart                 String?        @map("lqi_state_start")
-  lqiStateEnd                   String?        @map("lqi_state_end")
-  baselineRecovery              Int?           @map("baseline_recovery") @db.SmallInt
-  funRecoveryBonus              Int?           @map("fun_recovery_bonus") @db.SmallInt
-  jobDrain                      Int?           @map("job_drain") @db.SmallInt
-  eventHiEffectTotal            Int?           @map("event_hi_effect_total") @db.SmallInt
-  stressEffect                  Int?           @map("stress_effect") @db.SmallInt
-  hiNetChange                   Int?           @map("hi_net_change") @db.SmallInt
-  baselineRecoveryEfficiencyPct Decimal?       @map("baseline_recovery_efficiency_pct") @db.Decimal
-  funRecoveryEfficiencyPct      Decimal?       @map("fun_recovery_efficiency_pct") @db.Decimal
-  eventPoolBiasState            String?        @map("event_pool_bias_state")
-  forcedRestWeek                Int?           @map("forced_rest_week") @db.SmallInt
-  incomeLossFromForcedRest      Int?           @map("income_loss_from_forced_rest")
-  hiRecoveryFromForcedRest      Int?           @map("hi_recovery_from_forced_rest") @db.SmallInt
-  createdAt                     DateTime?      @default(now()) @map("created_at") @db.Timestamptz(6)
-  weeklyIndexProgress           Json           @default("{}") @map("weekly_index_progress")
-  month                         RunMonth @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                            BigInt    @id @default(autoincrement())
+  monthId                       BigInt    @unique @map("month_id")
+  hiStart                       Int?      @map("hi_start") @db.SmallInt
+  hiEnd                         Int?      @map("hi_end") @db.SmallInt
+  lqiStart                      Int?      @map("lqi_start") @db.SmallInt
+  lqiEnd                        Int?      @map("lqi_end") @db.SmallInt
+  lqiStateStart                 String?   @map("lqi_state_start")
+  lqiStateEnd                   String?   @map("lqi_state_end")
+  baselineRecovery              Int?      @map("baseline_recovery") @db.SmallInt
+  funRecoveryBonus              Int?      @map("fun_recovery_bonus") @db.SmallInt
+  jobDrain                      Int?      @map("job_drain") @db.SmallInt
+  eventHiEffectTotal            Int?      @map("event_hi_effect_total") @db.SmallInt
+  stressEffect                  Int?      @map("stress_effect") @db.SmallInt
+  hiNetChange                   Int?      @map("hi_net_change") @db.SmallInt
+  baselineRecoveryEfficiencyPct Decimal?  @map("baseline_recovery_efficiency_pct") @db.Decimal
+  funRecoveryEfficiencyPct      Decimal?  @map("fun_recovery_efficiency_pct") @db.Decimal
+  eventPoolBiasState            String?   @map("event_pool_bias_state")
+  forcedRestWeek                Int?      @map("forced_rest_week") @db.SmallInt
+  incomeLossFromForcedRest      Int?      @map("income_loss_from_forced_rest")
+  hiRecoveryFromForcedRest      Int?      @map("hi_recovery_from_forced_rest") @db.SmallInt
+  createdAt                     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  weeklyIndexProgress           Json      @default("{}") @map("weekly_index_progress")
+  month                         RunMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([monthId], map: "idx_month_index_resolution_month")
   @@map("month_index_resolution")
@@ -333,16 +328,16 @@ model MonthIndexResolution {
 }
 
 model MonthJar {
-  id                  BigInt         @id @default(autoincrement())
-  monthId             BigInt         @map("month_id")
-  jarCode             String         @map("jar_code")
-  allocatedAmount     Int            @default(0) @map("allocated_amount")
-  spentAmount         Int            @default(0) @map("spent_amount")
-  overflowInAmount    Int            @default(0) @map("overflow_in_amount")
-  overflowOutAmount   Int            @default(0) @map("overflow_out_amount")
-  remainingBalanceEnd Int            @default(0) @map("remaining_balance_end")
-  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  BigInt   @id @default(autoincrement())
+  monthId             BigInt   @map("month_id")
+  jarCode             String   @map("jar_code")
+  allocatedAmount     Int      @default(0) @map("allocated_amount")
+  spentAmount         Int      @default(0) @map("spent_amount")
+  overflowInAmount    Int      @default(0) @map("overflow_in_amount")
+  overflowOutAmount   Int      @default(0) @map("overflow_out_amount")
+  remainingBalanceEnd Int      @default(0) @map("remaining_balance_end")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   month               RunMonth @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([monthId, jarCode], map: "month_jars_unique")
@@ -351,19 +346,19 @@ model MonthJar {
 }
 
 model LifeEventTemplate {
-  id           BigInt             @id @default(autoincrement())
-  moduleId     Int                @map("module_id") @db.SmallInt
+  id           BigInt            @id @default(autoincrement())
+  moduleId     Int               @map("module_id") @db.SmallInt
   title        String
   description  String?
   category     String?
-  rarity       Int                @default(1) @db.SmallInt
-  meta         Json               @default("{}")
-  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  eventSource  String             @default("life") @map("event_source")
-  eventSubtype String?            @map("event_subtype")
-  events       MonthEvent[]
+  rarity       Int               @default(1) @db.SmallInt
+  meta         Json              @default("{}")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  eventSource  String            @default("life") @map("event_source")
+  eventSubtype String?           @map("event_subtype")
   options      LifeEventOption[]
-  module       Module             @relation(fields: [moduleId], references: [id], onUpdate: NoAction)
+  module       Module            @relation(fields: [moduleId], references: [id], onUpdate: NoAction)
+  events       MonthEvent[]
 
   @@index([moduleId], map: "idx_life_event_templates_module")
   @@map("life_event_templates")
@@ -371,19 +366,19 @@ model LifeEventTemplate {
 }
 
 model LifeEventOption {
-  id              BigInt             @id @default(autoincrement())
-  eventTemplateId BigInt             @map("event_template_id")
-  optionLabel     String             @map("option_label")
+  id              BigInt            @id @default(autoincrement())
+  eventTemplateId BigInt            @map("event_template_id")
+  optionLabel     String            @map("option_label")
   description     String?
-  moneyDelta      Int                @default(0) @map("money_delta")
-  healthDelta     Int                @default(0) @map("health_delta") @db.SmallInt
-  lqiDelta        Int                @default(0) @map("lqi_delta") @db.SmallInt
-  learningXpDelta Int                @default(0) @map("learning_xp_delta")
-  sortOrder       Int                @default(0) @map("sort_order")
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  moneyJarCode    String?            @map("default_jar_code")
+  moneyDelta      Int               @default(0) @map("money_delta")
+  healthDelta     Int               @default(0) @map("health_delta") @db.SmallInt
+  lqiDelta        Int               @default(0) @map("lqi_delta") @db.SmallInt
+  learningXpDelta Int               @default(0) @map("learning_xp_delta")
+  sortOrder       Int               @default(0) @map("sort_order")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  moneyJarCode    String?           @map("default_jar_code")
+  template        LifeEventTemplate @relation(fields: [eventTemplateId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   events          MonthEvent[]
-  template        LifeEventTemplate  @relation(fields: [eventTemplateId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([eventTemplateId], map: "idx_life_event_options_template")
   @@map("life_event_options")
@@ -400,9 +395,9 @@ model MonthEvent {
   paymentBreakdown Json?             @map("payment_breakdown")
   eventSource      String?           @map("event_source")
   eventSubtype     String?           @map("event_subtype")
-  month            RunMonth          @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   option           LifeEventOption?  @relation(fields: [chosenOptionId], references: [id], onUpdate: NoAction)
   template         LifeEventTemplate @relation(fields: [eventTemplateId], references: [id], onUpdate: NoAction)
+  month            RunMonth          @relation(fields: [monthId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([monthId, week, eventSource], map: "uq_month_events_month_week_source")
   @@index([monthId], map: "idx_month_events_month")
@@ -413,485 +408,530 @@ model MonthEvent {
   @@schema("budget")
 }
 
-
-/// ---------------- module 4 invest-simulation------------------
-
-// ---------------------------------------------------------------------------
-// Invest Simulation (Module 4)
-// ---------------------------------------------------------------------------
-
 model Sector {
-id                Int            @id @default(autoincrement()) @db.SmallInt
-code              String         @unique
-name              String
-description       String?
-sortOrder         Int            @default(0) @map("sort_order") @db.SmallInt
-createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-assets            Asset[]
-newsSectorImpacts SimNewsSectorImpact[]
+  id                Int                   @id @default(autoincrement()) @db.SmallInt
+  code              String                @unique
+  name              String
+  description       String?
+  sortOrder         Int                   @default(0) @map("sort_order") @db.SmallInt
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  assets            Asset[]
+  newsSectorImpacts SimNewsSectorImpact[]
+  arcSectorImpacts     WorldArcSectorImpact[]
+  policySectorImpacts  PolicySectorImpact[]
 
-@@map("sectors")
-@@schema("invest")
+  @@map("sectors")
+  @@schema("invest")
 }
 
 model Asset {
-id                   BigInt                        @id @default(autoincrement())
-sectorId             Int                           @map("sector_id") @db.SmallInt
-code                 String                        @unique
-name                 String
-assetType            String                        @map("asset_type")
-riskTier             String                        @map("risk_tier")
-volatilityProfile    String                        @map("volatility_profile")
-attentionSensitivity String                        @map("attention_sensitivity")
-description          String?
-meta                 Json                          @default("{}") @db.JsonB
-isActive             Boolean                       @default(true) @map("is_active")
-createdAt            DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
-sector               Sector                  @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
-pricePoints          AssetPricePoint[]
-positions            PortfolioPosition[]
-transactions         PortfolioTransaction[]
-newsAssetImpacts     SimNewsAssetImpact[]
-spotlightInstances   AssetSpotlightInstance[]
+  id                   BigInt                   @id @default(autoincrement())
+  sectorId             Int                      @map("sector_id") @db.SmallInt
+  code                 String                   @unique
+  name                 String
+  assetType            String                   @map("asset_type")
+  riskTier             String                   @map("risk_tier")
+  volatilityProfile    String                   @map("volatility_profile")
+  attentionSensitivity String                   @map("attention_sensitivity")
+  description          String?
+  category             String?
+  meta                 Json                     @default("{}")
+  isActive             Boolean                  @default(true) @map("is_active")
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  pricePoints          AssetPricePoint[]
+  spotlightInstances   AssetSpotlightInstance[]
+  sector               Sector                   @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+  positions            PortfolioPosition[]
+  transactions         PortfolioTransaction[]
+  newsAssetImpacts     SimNewsAssetImpact[]
+  arcAssetAffinities   ArcAssetAffinity[]
 
-@@index([sectorId], map: "idx_assets_sector")
-@@index([assetType], map: "idx_assets_type")
-@@map("assets")
-@@schema("invest")
+  @@index([sectorId], map: "idx_assets_sector")
+  @@index([assetType], map: "idx_assets_type")
+  @@map("assets")
+  @@schema("invest")
 }
 
 model MarketTick {
-id         BigInt                      @id @default(autoincrement())
-tickIndex  BigInt                      @unique @map("tick_index")
-simDay     Int                         @default(0) @map("sim_day")
-simMonth   Int                         @default(0) @map("sim_month")
-simYear    Int                         @default(0) @map("sim_year")
-createdAt  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-worldState           WorldStateAtTick?
-pricePoints          AssetPricePoint[]
-events               MarketEventLog[]
-newsItems            SimNewsItem[]
-transactions         PortfolioTransaction[]
-behaviorWindowStarts BehaviorWindow[]       @relation("BehaviorWindowStartTick")
-behaviorWindowEnds   BehaviorWindow[]       @relation("BehaviorWindowEndTick")
-stabilityMetrics     UserStabilityMetric[]
-reflections          UserReflection[]
-reports              SimReport[]
+  id                   BigInt                 @id @default(autoincrement())
+  tickIndex            BigInt                 @unique @map("tick_index")
+  simDay               Int                    @default(0) @map("sim_day")
+  simMonth             Int                    @default(0) @map("sim_month")
+  simYear              Int                    @default(0) @map("sim_year")
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  pricePoints          AssetPricePoint[]
+  behaviorWindowEnds   BehaviorWindow[]       @relation("BehaviorWindowEndTick")
+  behaviorWindowStarts BehaviorWindow[]       @relation("BehaviorWindowStartTick")
+  events               MarketEventLog[]
+  transactions         PortfolioTransaction[]
+  newsItems            SimNewsItem[]
+  reports              SimReport[]
+  reflections          UserReflection[]
+  stabilityMetrics     UserStabilityMetric[]
+  worldState           WorldStateAtTick?
 
-@@map("market_ticks")
-@@schema("invest")
+  @@map("market_ticks")
+  @@schema("invest")
 }
 
 model WorldStateAtTick {
-id        BigInt           @id @default(autoincrement())
-tickId    BigInt           @unique @map("tick_id")
-stateData Json             @default("{}") @map("state_data") @db.JsonB
-createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-tick      MarketTick @relation(fields: [tickId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id        BigInt     @id @default(autoincrement())
+  tickId    BigInt     @unique @map("tick_id")
+  stateData Json       @default("{}") @map("state_data")
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  tick      MarketTick @relation(fields: [tickId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@map("world_state_at_tick")
-@@schema("invest")
+  @@map("world_state_at_tick")
+  @@schema("invest")
 }
 
 model AssetPricePoint {
-id             BigInt           @id @default(autoincrement())
-assetId        BigInt           @map("asset_id")
-tickId         BigInt           @map("tick_id")
-price          Int
-changeFromPrev Int              @default(0) @map("change_from_prev")
-changePct      Decimal          @default(0) @map("change_pct") @db.Decimal(8, 4)
-createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-asset          Asset      @relation(fields: [assetId], references: [id], onUpdate: NoAction)
-tick           MarketTick @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+  id             BigInt     @id @default(autoincrement())
+  assetId        BigInt     @map("asset_id")
+  tickId         BigInt     @map("tick_id")
+  price          Int
+  changeFromPrev Int        @default(0) @map("change_from_prev")
+  changePct      Decimal    @default(0) @map("change_pct") @db.Decimal(8, 4)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset          Asset      @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  tick           MarketTick @relation(fields: [tickId], references: [id], onUpdate: NoAction)
 
-@@unique([assetId, tickId])
-@@index([tickId], map: "idx_price_points_tick")
-@@index([assetId], map: "idx_price_points_asset")
-@@map("asset_price_points")
-@@schema("invest")
+  @@unique([assetId, tickId])
+  @@index([tickId], map: "idx_price_points_tick")
+  @@index([assetId], map: "idx_price_points_asset")
+  @@map("asset_price_points")
+  @@schema("invest")
 }
 
 model MarketEventTemplate {
-id           BigInt                 @id @default(autoincrement())
-title        String
-description  String?
-isPositive   Boolean                @default(true) @map("is_positive")
-impactMinPct Decimal                @default(0) @map("impact_min_pct") @db.Decimal(8, 4)
-impactMaxPct Decimal                @default(0) @map("impact_max_pct") @db.Decimal(8, 4)
-rarity       Int                    @default(1) @db.SmallInt
-meta         Json                   @default("{}") @db.JsonB
-createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-events       MarketEventLog[]
+  id           BigInt           @id @default(autoincrement())
+  title        String
+  description  String?
+  isPositive   Boolean          @default(true) @map("is_positive")
+  impactMinPct Decimal          @default(0) @map("impact_min_pct") @db.Decimal(8, 4)
+  impactMaxPct Decimal          @default(0) @map("impact_max_pct") @db.Decimal(8, 4)
+  rarity       Int              @default(1) @db.SmallInt
+  meta         Json             @default("{}")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  events       MarketEventLog[]
 
-@@map("market_event_templates")
-@@schema("invest")
+  @@map("market_event_templates")
+  @@schema("invest")
 }
 
 model MarketEventLog {
-id               BigInt                    @id @default(autoincrement())
-tickId           BigInt                    @map("tick_id")
-eventTemplateId  BigInt                    @map("event_template_id")
-appliedImpactPct Decimal                   @default(0) @map("applied_impact_pct") @db.Decimal(8, 4)
-appliedMeta      Json                      @default("{}") @map("applied_meta") @db.JsonB
-occurredAt       DateTime                  @default(now()) @map("occurred_at") @db.Timestamptz(6)
-tick             MarketTick          @relation(fields: [tickId], references: [id], onUpdate: NoAction)
-template         MarketEventTemplate @relation(fields: [eventTemplateId], references: [id], onUpdate: NoAction)
+  id               BigInt              @id @default(autoincrement())
+  tickId           BigInt              @map("tick_id")
+  eventTemplateId  BigInt              @map("event_template_id")
+  appliedImpactPct Decimal             @default(0) @map("applied_impact_pct") @db.Decimal(8, 4)
+  appliedMeta      Json                @default("{}") @map("applied_meta")
+  occurredAt       DateTime            @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  template         MarketEventTemplate @relation(fields: [eventTemplateId], references: [id], onUpdate: NoAction)
+  tick             MarketTick          @relation(fields: [tickId], references: [id], onUpdate: NoAction)
 
-@@index([tickId], map: "idx_event_log_tick")
-@@map("market_event_log")
-@@schema("invest")
+  @@index([tickId], map: "idx_event_log_tick")
+  @@map("market_event_log")
+  @@schema("invest")
 }
 
 model UserCredit {
-id        BigInt   @id @default(autoincrement())
-userId    String   @unique @map("user_id") @db.Uuid
-balance   Int      @default(0)
-updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @unique @map("user_id") @db.Uuid
+  balance   Int      @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@map("user_credits")
-@@schema("invest")
+  @@map("user_credits")
+  @@schema("invest")
 }
 
 model PortfolioPosition {
-id          BigInt      @id @default(autoincrement())
-userId      String      @map("user_id") @db.Uuid
-assetId     BigInt      @map("asset_id")
-quantity    Float       @default(0)
-avgBuyPrice Int         @default(0) @map("avg_buy_price")
-updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-asset       Asset @relation(fields: [assetId], references: [id], onUpdate: NoAction)
-user        AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id          BigInt   @id @default(autoincrement())
+  userId      String   @map("user_id") @db.Uuid
+  assetId     BigInt   @map("asset_id")
+  quantity    Float    @default(0)
+  avgBuyPrice Int      @default(0) @map("avg_buy_price")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset       Asset    @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  user        AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@unique([userId, assetId])
-@@index([userId], map: "idx_positions_user")
-@@index([assetId], map: "idx_positions_asset")
-@@map("portfolio_positions")
-@@schema("invest")
+  @@unique([userId, assetId])
+  @@index([userId], map: "idx_positions_user")
+  @@index([assetId], map: "idx_positions_asset")
+  @@map("portfolio_positions")
+  @@schema("invest")
 }
 
 model PortfolioTransaction {
-id           BigInt           @id @default(autoincrement())
-userId       String           @map("user_id") @db.Uuid
-assetId      BigInt           @map("asset_id")
-tickId       BigInt           @map("tick_id")
-side         String
-quantity     Float
-pricePerUnit Int              @map("price_per_unit")
-totalAmount  Int              @map("total_amount")
-createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-asset        Asset      @relation(fields: [assetId], references: [id], onUpdate: NoAction)
-tick         MarketTick @relation(fields: [tickId], references: [id], onUpdate: NoAction)
-user         AppUser          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id           BigInt     @id @default(autoincrement())
+  userId       String     @map("user_id") @db.Uuid
+  assetId      BigInt     @map("asset_id")
+  tickId       BigInt     @map("tick_id")
+  side         String
+  quantity     Float
+  pricePerUnit Int        @map("price_per_unit")
+  totalAmount  Int        @map("total_amount")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset        Asset      @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  tick         MarketTick @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+  user         AppUser    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@index([userId], map: "idx_transactions_user")
-@@index([assetId], map: "idx_transactions_asset")
-@@index([userId, createdAt], map: "idx_transactions_user_time")
-@@map("portfolio_transactions")
-@@schema("invest")
+  @@index([userId], map: "idx_transactions_user")
+  @@index([assetId], map: "idx_transactions_asset")
+  @@index([userId, createdAt], map: "idx_transactions_user_time")
+  @@map("portfolio_transactions")
+  @@schema("invest")
 }
 
-// ---------------------------------------------------------------------------
-// Invest Simulation — Phase 2: News, Spotlights, World Arcs
-// ---------------------------------------------------------------------------
-
 model SimNewsItem {
-id           BigInt                      @id @default(autoincrement())
-tickId       BigInt                      @map("tick_id")
-simDay       Int                         @default(0) @map("sim_day")
-simMonth     Int                         @default(0) @map("sim_month")
-simYear      Int                         @default(0) @map("sim_year")
-title        String
-body         String?
-tone         String                      @default("neutral")
-intensity    Decimal                     @default(0) @db.Decimal(5, 2)
-narrativeTag String?                     @map("narrative_tag")
-createdAt    DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-tick         MarketTick            @relation(fields: [tickId], references: [id], onUpdate: NoAction)
-assetImpacts SimNewsAssetImpact[]
-sectorImpacts SimNewsSectorImpact[]
+  id            BigInt                @id @default(autoincrement())
+  tickId        BigInt                @map("tick_id")
+  simDay        Int                   @default(0) @map("sim_day")
+  simMonth      Int                   @default(0) @map("sim_month")
+  simYear       Int                   @default(0) @map("sim_year")
+  title         String
+  body          String?
+  tone          String                @default("neutral")
+  intensity     Decimal               @default(0) @db.Decimal(5, 2)
+  narrativeTag  String?               @map("narrative_tag")
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  assetImpacts  SimNewsAssetImpact[]
+  tick          MarketTick            @relation(fields: [tickId], references: [id], onUpdate: NoAction)
+  sectorImpacts SimNewsSectorImpact[]
 
-@@index([tickId], map: "idx_news_tick")
-@@map("sim_news_items")
-@@schema("invest")
+  @@index([tickId], map: "idx_news_tick")
+  @@map("sim_news_items")
+  @@schema("invest")
 }
 
 model SimNewsAssetImpact {
-id        BigInt           @id @default(autoincrement())
-newsId    BigInt           @map("news_id")
-assetId   BigInt           @map("asset_id")
-impactPct Decimal          @default(0) @map("impact_pct") @db.Decimal(8, 4)
-news      SimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-asset     Asset       @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  id        BigInt      @id @default(autoincrement())
+  newsId    BigInt      @map("news_id")
+  assetId   BigInt      @map("asset_id")
+  impactPct Decimal     @default(0) @map("impact_pct") @db.Decimal(8, 4)
+  asset     Asset       @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  news      SimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@index([newsId], map: "idx_news_asset_impact_news")
-@@map("sim_news_asset_impacts")
-@@schema("invest")
+  @@index([newsId], map: "idx_news_asset_impact_news")
+  @@map("sim_news_asset_impacts")
+  @@schema("invest")
 }
 
 model SimNewsSectorImpact {
-id        BigInt            @id @default(autoincrement())
-newsId    BigInt            @map("news_id")
-sectorId  Int               @map("sector_id") @db.SmallInt
-impactPct Decimal           @default(0) @map("impact_pct") @db.Decimal(8, 4)
-news      SimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-sector    Sector      @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+  id        BigInt      @id @default(autoincrement())
+  newsId    BigInt      @map("news_id")
+  sectorId  Int         @map("sector_id") @db.SmallInt
+  impactPct Decimal     @default(0) @map("impact_pct") @db.Decimal(8, 4)
+  news      SimNewsItem @relation(fields: [newsId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sector    Sector      @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
 
-@@index([newsId], map: "idx_news_sector_impact_news")
-@@map("sim_news_sector_impacts")
-@@schema("invest")
+  @@index([newsId], map: "idx_news_sector_impact_news")
+  @@map("sim_news_sector_impacts")
+  @@schema("invest")
 }
 
 model AssetSpotlightTemplate {
-id          BigInt                        @id @default(autoincrement())
-code        String                        @unique
-title       String
-description String?
-rarity      Int                           @default(1) @db.SmallInt
-meta        Json                          @default("{}") @db.JsonB
-createdAt   DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
-instances   AssetSpotlightInstance[]
+  id                    BigInt                   @id @default(autoincrement())
+  code                  String                   @unique
+  title                 String
+  description           String?
+  rarity                Int                      @default(1) @db.SmallInt
+  meta                  Json                     @default("{}")
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  instances             AssetSpotlightInstance[]
+  arcSpotlightTemplates ArcSpotlightTemplate[]
 
-@@map("asset_spotlight_templates")
-@@schema("invest")
+  @@map("asset_spotlight_templates")
+  @@schema("invest")
 }
 
 model AssetSpotlightInstance {
-id                  BigInt                       @id @default(autoincrement())
-templateId          BigInt                       @map("template_id")
-assetId             BigInt                       @map("asset_id")
-state               String                       @default("dormant")
-ticksInCurrentState Int                          @default(0) @map("ticks_in_current_state")
-startedAtTick       BigInt                       @map("started_at_tick")
-endedAtTick         BigInt?                      @map("ended_at_tick")
-cooldownUntilTick   BigInt?                      @map("cooldown_until_tick")
-isActive            Boolean                      @default(true) @map("is_active")
-meta                Json                         @default("{}") @db.JsonB
-createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-template            AssetSpotlightTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
-asset               Asset                  @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  id                  BigInt                 @id @default(autoincrement())
+  templateId          BigInt                 @map("template_id")
+  assetId             BigInt                 @map("asset_id")
+  state               String                 @default("dormant")
+  ticksInCurrentState Int                    @default(0) @map("ticks_in_current_state")
+  startedAtTick       BigInt                 @map("started_at_tick")
+  endedAtTick         BigInt?                @map("ended_at_tick")
+  cooldownUntilTick   BigInt?                @map("cooldown_until_tick")
+  isActive            Boolean                @default(true) @map("is_active")
+  meta                Json                   @default("{}")
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  asset               Asset                  @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+  template            AssetSpotlightTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
 
-@@index([assetId], map: "idx_spotlight_inst_asset")
-@@index([isActive], map: "idx_spotlight_inst_active")
-@@map("asset_spotlight_instances")
-@@schema("invest")
+  @@index([assetId], map: "idx_spotlight_inst_asset")
+  @@index([isActive], map: "idx_spotlight_inst_active")
+  @@map("asset_spotlight_instances")
+  @@schema("invest")
 }
 
 model WorldArcType {
-id          Int                      @id @default(autoincrement()) @db.SmallInt
-code        String                   @unique
-name        String
-description String?
-instances   WorldArcInstance[]
+  id                    Int                    @id @default(autoincrement()) @db.SmallInt
+  code                  String                 @unique
+  name                  String
+  description           String?
+  instances             WorldArcInstance[]
+  sectorImpacts         WorldArcSectorImpact[]
+  arcSpotlightTemplates ArcSpotlightTemplate[]
+  arcAssetAffinities    ArcAssetAffinity[]
 
-@@map("world_arc_types")
-@@schema("invest")
+  @@map("world_arc_types")
+  @@schema("invest")
 }
 
 model WorldArcInstance {
-id             BigInt             @id @default(autoincrement())
-arcTypeId      Int                @map("arc_type_id") @db.SmallInt
-state          String             @default("background")
-ticksInCurrentState Int           @default(0) @map("ticks_in_current_state")
-progress       Decimal            @default(0) @db.Decimal(5, 2)
-startedAtTick  BigInt             @map("started_at_tick")
-endedAtTick    BigInt?            @map("ended_at_tick")
-isActive       Boolean            @default(true) @map("is_active")
-meta           Json               @default("{}") @db.JsonB
-createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-arcType        WorldArcType @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
+  id                  BigInt       @id @default(autoincrement())
+  arcTypeId           Int          @map("arc_type_id") @db.SmallInt
+  state               String       @default("background")
+  ticksInCurrentState Int          @default(0) @map("ticks_in_current_state")
+  progress            Decimal      @default(0) @db.Decimal(5, 2)
+  startedAtTick       BigInt       @map("started_at_tick")
+  endedAtTick         BigInt?      @map("ended_at_tick")
+  isActive            Boolean      @default(true) @map("is_active")
+  meta                Json         @default("{}")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  arcType             WorldArcType @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
 
-@@index([isActive], map: "idx_arc_inst_active")
-@@map("world_arc_instances")
-@@schema("invest")
+  @@index([isActive], map: "idx_arc_inst_active")
+  @@map("world_arc_instances")
+  @@schema("invest")
+}
+
+model WorldArcSectorImpact {
+  id        Int          @id @default(autoincrement())
+  arcTypeId Int          @map("arc_type_id") @db.SmallInt
+  sectorId  Int          @map("sector_id") @db.SmallInt
+  category  String?
+  weight    Decimal      @db.Decimal(4, 2)
+  arcType   WorldArcType @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
+  sector    Sector       @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+
+  @@unique([arcTypeId, sectorId, category], map: "uq_arc_sector_category")
+  @@map("world_arc_sector_impacts")
+  @@schema("invest")
+}
+
+model ArcSpotlightTemplate {
+  id         Int                    @id @default(autoincrement())
+  arcTypeId  Int                    @map("arc_type_id") @db.SmallInt
+  templateId BigInt                 @map("template_id")
+  weight     Decimal                @default(1.0) @db.Decimal(4, 2)
+  arcType    WorldArcType           @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
+  template   AssetSpotlightTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+
+  @@unique([arcTypeId, templateId], map: "uq_arc_spotlight_template")
+  @@map("arc_spotlight_templates")
+  @@schema("invest")
+}
+
+model ArcAssetAffinity {
+  id        Int          @id @default(autoincrement())
+  arcTypeId Int          @map("arc_type_id") @db.SmallInt
+  assetId   BigInt       @map("asset_id")
+  affinity  Decimal      @db.Decimal(4, 2)
+  arcType   WorldArcType @relation(fields: [arcTypeId], references: [id], onUpdate: NoAction)
+  asset     Asset        @relation(fields: [assetId], references: [id], onUpdate: NoAction)
+
+  @@unique([arcTypeId, assetId], map: "uq_arc_asset_affinity")
+  @@map("arc_asset_affinities")
+  @@schema("invest")
 }
 
 model PolicyThreadTemplate {
-id          BigInt                       @id @default(autoincrement())
-code        String                       @unique
-title       String
-description String?
-rarity      Int                          @default(1) @db.SmallInt
-meta        Json                         @default("{}") @db.JsonB
-createdAt   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-instances   PolicyThreadInstance[]
+  id          BigInt                 @id @default(autoincrement())
+  code        String                 @unique
+  title       String
+  description String?
+  rarity            Int                    @default(1) @db.SmallInt
+  stateDescriptions Json                   @default("{}") @map("state_descriptions")
+  meta              Json                   @default("{}")
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  instances     PolicyThreadInstance[]
+  sectorImpacts PolicySectorImpact[]
 
-@@map("policy_thread_templates")
-@@schema("invest")
+  @@map("policy_thread_templates")
+  @@schema("invest")
 }
 
-// ---------------------------------------------------------------------------
-// Invest Simulation — Phase 3: Policy Threads, Behavior, Scoring
-// ---------------------------------------------------------------------------
-
 model PolicyThreadInstance {
-id                  BigInt                       @id @default(autoincrement())
-templateId          BigInt                       @map("template_id")
-state               String                       @default("undeclared")
-ticksInCurrentState Int                          @default(0) @map("ticks_in_current_state")
-actionsTotal        Int                          @default(3) @map("actions_total") @db.SmallInt
-actionsCompleted    Int                          @default(0) @map("actions_completed") @db.SmallInt
-startedAtTick       BigInt                       @map("started_at_tick")
-resolvedAtTick      BigInt?                      @map("resolved_at_tick")
-isActive            Boolean                      @default(true) @map("is_active")
-meta                Json                         @default("{}") @db.JsonB
-createdAt           DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-template            PolicyThreadTemplate   @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+  id                  BigInt               @id @default(autoincrement())
+  templateId          BigInt               @map("template_id")
+  state               String               @default("undeclared")
+  ticksInCurrentState Int                  @default(0) @map("ticks_in_current_state")
+  actionsTotal        Int                  @default(3) @map("actions_total") @db.SmallInt
+  actionsCompleted    Int                  @default(0) @map("actions_completed") @db.SmallInt
+  startedAtTick       BigInt               @map("started_at_tick")
+  resolvedAtTick      BigInt?              @map("resolved_at_tick")
+  isActive            Boolean              @default(true) @map("is_active")
+  meta                Json                 @default("{}")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  template            PolicyThreadTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
 
-@@index([isActive], map: "idx_policy_inst_active")
-@@map("policy_thread_instances")
-@@schema("invest")
+  @@index([isActive], map: "idx_policy_inst_active")
+  @@map("policy_thread_instances")
+  @@schema("invest")
+}
+
+model PolicySectorImpact {
+  id         Int                  @id @default(autoincrement())
+  templateId BigInt               @map("template_id")
+  sectorId   Int                  @map("sector_id") @db.SmallInt
+  category   String?
+  weight     Decimal              @db.Decimal(4, 2)
+  template   PolicyThreadTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+  sector     Sector               @relation(fields: [sectorId], references: [id], onUpdate: NoAction)
+
+  @@unique([templateId, sectorId, category], map: "uq_policy_sector_category")
+  @@map("policy_sector_impacts")
+  @@schema("invest")
 }
 
 model BehaviorWindow {
-id              BigInt                       @id @default(autoincrement())
-windowType      String                       @map("window_type")
-startTickIndex  BigInt                       @map("start_tick_index")
-endTickIndex    BigInt?                      @map("end_tick_index")
-triggerReason   String                       @map("trigger_reason")
-isOpen          Boolean                      @default(true) @map("is_open")
-createdAt       DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-startTick       MarketTick             @relation("BehaviorWindowStartTick", fields: [startTickIndex], references: [tickIndex], onUpdate: NoAction)
-endTick         MarketTick?            @relation("BehaviorWindowEndTick", fields: [endTickIndex], references: [tickIndex], onUpdate: NoAction)
-snapshots       UserBehaviorSnapshot[]
+  id             BigInt                 @id @default(autoincrement())
+  windowType     String                 @map("window_type")
+  startTickIndex BigInt                 @map("start_tick_index")
+  endTickIndex   BigInt?                @map("end_tick_index")
+  triggerReason  String                 @map("trigger_reason")
+  isOpen         Boolean                @default(true) @map("is_open")
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  endTick        MarketTick?            @relation("BehaviorWindowEndTick", fields: [endTickIndex], references: [tickIndex], onUpdate: NoAction)
+  startTick      MarketTick             @relation("BehaviorWindowStartTick", fields: [startTickIndex], references: [tickIndex], onUpdate: NoAction)
+  snapshots      UserBehaviorSnapshot[]
 
-@@index([isOpen], map: "idx_bw_open")
-@@index([startTickIndex], map: "idx_bw_start_tick")
-@@map("behavior_windows")
-@@schema("invest")
+  @@index([isOpen], map: "idx_bw_open")
+  @@index([startTickIndex], map: "idx_bw_start_tick")
+  @@map("behavior_windows")
+  @@schema("invest")
 }
 
 model UserBehaviorSnapshot {
-id                     BigInt              @id @default(autoincrement())
-userId                 String              @map("user_id") @db.Uuid
-windowId               BigInt              @map("window_id")
-turnoverScore          Decimal             @default(0) @map("turnover_score") @db.Decimal(8, 4)
-reactionTimeScore      Decimal             @default(0) @map("reaction_time_score") @db.Decimal(8, 4)
-concentrationChange    Decimal             @default(0) @map("concentration_change") @db.Decimal(8, 4)
-volatilityChasingScore Decimal             @default(0) @map("volatility_chasing_score") @db.Decimal(8, 4)
-exposureBySector       Json                @default("{}") @map("exposure_by_sector") @db.JsonB
-exposureByAssetType    Json                @default("{}") @map("exposure_by_asset_type") @db.JsonB
-createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-window                 BehaviorWindow @relation(fields: [windowId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                     BigInt         @id @default(autoincrement())
+  userId                 String         @map("user_id") @db.Uuid
+  windowId               BigInt         @map("window_id")
+  turnoverScore          Decimal        @default(0) @map("turnover_score") @db.Decimal(8, 4)
+  reactionTimeScore      Decimal        @default(0) @map("reaction_time_score") @db.Decimal(8, 4)
+  concentrationChange    Decimal        @default(0) @map("concentration_change") @db.Decimal(8, 4)
+  volatilityChasingScore Decimal        @default(0) @map("volatility_chasing_score") @db.Decimal(8, 4)
+  exposureBySector       Json           @default("{}") @map("exposure_by_sector")
+  exposureByAssetType    Json           @default("{}") @map("exposure_by_asset_type")
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  window                 BehaviorWindow @relation(fields: [windowId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-@@index([userId], map: "idx_behavior_snap_user")
-@@index([windowId], map: "idx_behavior_snap_window")
-@@map("user_behavior_snapshots")
-@@schema("invest")
+  @@index([userId], map: "idx_behavior_snap_user")
+  @@index([windowId], map: "idx_behavior_snap_window")
+  @@map("user_behavior_snapshots")
+  @@schema("invest")
 }
 
 model UserStabilityMetric {
-id                   BigInt           @id @default(autoincrement())
-userId               String           @map("user_id") @db.Uuid
-tickIndex            BigInt           @map("tick_index")
-diversificationScore Decimal          @default(0) @map("diversification_score") @db.Decimal(8, 4)
-volatilityScore      Decimal          @default(0) @map("volatility_score") @db.Decimal(8, 4)
-concentrationPenalty Decimal          @default(0) @map("concentration_penalty") @db.Decimal(8, 4)
-holdingDurationScore Decimal          @default(0) @map("holding_duration_score") @db.Decimal(8, 4)
-stabilityFactor      Decimal          @default(1) @map("stability_factor") @db.Decimal(8, 4)
-calculatedAt         DateTime         @default(now()) @map("calculated_at") @db.Timestamptz(6)
-tick                 MarketTick @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
+  id                   BigInt     @id @default(autoincrement())
+  userId               String     @map("user_id") @db.Uuid
+  tickIndex            BigInt     @map("tick_index")
+  diversificationScore Decimal    @default(0) @map("diversification_score") @db.Decimal(8, 4)
+  volatilityScore      Decimal    @default(0) @map("volatility_score") @db.Decimal(8, 4)
+  concentrationPenalty Decimal    @default(0) @map("concentration_penalty") @db.Decimal(8, 4)
+  holdingDurationScore Decimal    @default(0) @map("holding_duration_score") @db.Decimal(8, 4)
+  stabilityFactor      Decimal    @default(1) @map("stability_factor") @db.Decimal(8, 4)
+  calculatedAt         DateTime   @default(now()) @map("calculated_at") @db.Timestamptz(6)
+  tick                 MarketTick @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
 
-@@index([userId], map: "idx_stability_user")
-@@index([userId, tickIndex], map: "idx_stability_user_tick")
-@@map("user_stability_metrics")
-@@schema("invest")
+  @@index([userId], map: "idx_stability_user")
+  @@index([userId, tickIndex], map: "idx_stability_user_tick")
+  @@map("user_stability_metrics")
+  @@schema("invest")
 }
 
 model UserScore {
-userId           String   @id @map("user_id") @db.Uuid
-wealthPoints     Decimal  @default(0) @map("wealth_points") @db.Decimal(12, 2)
-stabilityFactor  Decimal  @default(1) @map("stability_factor") @db.Decimal(8, 4)
-wealthTier       String   @default("beginner") @map("wealth_tier")
-lastCalculatedAt DateTime @default(now()) @map("last_calculated_at") @db.Timestamptz(6)
+  userId           String   @id @map("user_id") @db.Uuid
+  wealthPoints     Decimal  @default(0) @map("wealth_points") @db.Decimal(12, 2)
+  stabilityFactor  Decimal  @default(1) @map("stability_factor") @db.Decimal(8, 4)
+  wealthTier       String   @default("beginner") @map("wealth_tier")
+  lastCalculatedAt DateTime @default(now()) @map("last_calculated_at") @db.Timestamptz(6)
 
-@@map("user_scores")
-@@schema("invest")
+  @@map("user_scores")
+  @@schema("invest")
 }
 
-// ---------------------------------------------------------------------------
-// Invest Simulation — Phase 4: Reflections, Missions, Reports
-// ---------------------------------------------------------------------------
-
 model ReflectionTemplate {
-id           BigInt               @id @default(autoincrement())
-code         String               @unique
-title        String
-bodyTemplate String               @map("body_template")
-condition    Json                 @default("{}") @db.JsonB
-meta         Json                 @default("{}") @db.JsonB
-createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-reflections  UserReflection[]
+  id           BigInt           @id @default(autoincrement())
+  code         String           @unique
+  title        String
+  bodyTemplate String           @map("body_template")
+  condition    Json             @default("{}")
+  meta         Json             @default("{}")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  reflections  UserReflection[]
 
-@@map("reflection_templates")
-@@schema("invest")
+  @@map("reflection_templates")
+  @@schema("invest")
 }
 
 model UserReflection {
-id             BigInt                   @id @default(autoincrement())
-userId         String                   @map("user_id") @db.Uuid
-tickIndex      BigInt                   @map("tick_index")
-templateId     BigInt                   @map("template_id")
-reflectionText String                   @map("reflection_text")
-createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-template       ReflectionTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
-tick           MarketTick         @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
+  id             BigInt             @id @default(autoincrement())
+  userId         String             @map("user_id") @db.Uuid
+  tickIndex      BigInt             @map("tick_index")
+  templateId     BigInt             @map("template_id")
+  reflectionText String             @map("reflection_text")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  template       ReflectionTemplate @relation(fields: [templateId], references: [id], onUpdate: NoAction)
+  tick           MarketTick         @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
 
-@@index([userId], map: "idx_reflections_user")
-@@index([userId, tickIndex], map: "idx_reflections_user_tick")
-@@map("user_reflections")
-@@schema("invest")
+  @@index([userId], map: "idx_reflections_user")
+  @@index([userId, tickIndex], map: "idx_reflections_user_tick")
+  @@map("user_reflections")
+  @@schema("invest")
 }
 
 model Mission {
-id            BigInt              @id @default(autoincrement())
-code          String              @unique
-title         String
-description   String?
-condition     Json                @default("{}") @db.JsonB
-rewardCredits Int                 @default(0) @map("reward_credits")
-createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-userMissions  UserMission[]
+  id            BigInt        @id @default(autoincrement())
+  code          String        @unique
+  title         String
+  description   String?
+  condition     Json          @default("{}")
+  rewardCredits Int           @default(0) @map("reward_credits")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  userMissions  UserMission[]
 
-@@map("missions")
-@@schema("invest")
+  @@map("missions")
+  @@schema("invest")
 }
 
 model UserMission {
-id          BigInt        @id @default(autoincrement())
-userId      String        @map("user_id") @db.Uuid
-missionId   BigInt        @map("mission_id")
-status      String        @default("active")
-progress    Json          @default("{}") @db.JsonB
-unlockedAt  DateTime      @default(now()) @map("unlocked_at") @db.Timestamptz(6)
-completedAt DateTime?     @map("completed_at") @db.Timestamptz(6)
-mission     Mission @relation(fields: [missionId], references: [id], onUpdate: NoAction)
+  id          BigInt    @id @default(autoincrement())
+  userId      String    @map("user_id") @db.Uuid
+  missionId   BigInt    @map("mission_id")
+  status      String    @default("active")
+  progress    Json      @default("{}")
+  unlockedAt  DateTime  @default(now()) @map("unlocked_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  mission     Mission   @relation(fields: [missionId], references: [id], onUpdate: NoAction)
 
-@@unique([userId, missionId])
-@@index([userId], map: "idx_user_missions_user")
-@@map("user_missions")
-@@schema("invest")
+  @@unique([userId, missionId])
+  @@index([userId], map: "idx_user_missions_user")
+  @@map("user_missions")
+  @@schema("invest")
 }
 
 model SimReport {
-id                BigInt           @id @default(autoincrement())
-userId            String           @map("user_id") @db.Uuid
-tickIndex         BigInt           @map("tick_index")
-simDay            Int              @map("sim_day")
-simMonth          Int              @map("sim_month")
-simYear           Int              @map("sim_year")
-sectorExposure    Json             @default("{}") @map("sector_exposure") @db.JsonB
-assetTypeExposure Json             @default("{}") @map("asset_type_exposure") @db.JsonB
-avgVolatility     Decimal          @default(0) @map("avg_volatility") @db.Decimal(8, 4)
-stabilityScore    Decimal          @default(0) @map("stability_score") @db.Decimal(8, 4)
-reflectionSummary String?          @map("reflection_summary")
-generatedAt       DateTime         @default(now()) @map("generated_at") @db.Timestamptz(6)
-tick              MarketTick @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
+  id                BigInt     @id @default(autoincrement())
+  userId            String     @map("user_id") @db.Uuid
+  tickIndex         BigInt     @map("tick_index")
+  simDay            Int        @map("sim_day")
+  simMonth          Int        @map("sim_month")
+  simYear           Int        @map("sim_year")
+  sectorExposure    Json       @default("{}") @map("sector_exposure")
+  assetTypeExposure Json       @default("{}") @map("asset_type_exposure")
+  avgVolatility     Decimal    @default(0) @map("avg_volatility") @db.Decimal(8, 4)
+  stabilityScore    Decimal    @default(0) @map("stability_score") @db.Decimal(8, 4)
+  reflectionSummary String?    @map("reflection_summary")
+  generatedAt       DateTime   @default(now()) @map("generated_at") @db.Timestamptz(6)
+  tick              MarketTick @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
 
-@@index([userId], map: "idx_reports_user")
-@@index([userId, tickIndex], map: "idx_reports_user_tick")
-@@map("sim_reports")
-@@schema("invest")
+  @@index([userId], map: "idx_reports_user")
+  @@index([userId, tickIndex], map: "idx_reports_user_tick")
+  @@map("sim_reports")
+  @@schema("invest")
 }

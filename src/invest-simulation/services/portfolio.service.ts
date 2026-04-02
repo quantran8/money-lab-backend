@@ -30,7 +30,7 @@ export class InvestPortfolioService {
       const balance = credit?.balance ?? 0;
 
       // Build price map from latest tick
-      let priceMap: PriceMap = {};
+      const priceMap: PriceMap = {};
       if (tick) {
         const prices = await this.marketQuery.findLatestPrices(tick.id);
         for (const p of prices) {
@@ -48,7 +48,11 @@ export class InvestPortfolioService {
       }));
 
       const summary = calculatePortfolioSummary(balance, posInputs, priceMap);
-      const sectorExposure = calculateExposure(posInputs, priceMap, 'sectorCode');
+      const sectorExposure = calculateExposure(
+        posInputs,
+        priceMap,
+        'sectorCode',
+      );
       const typeExposure = calculateExposure(posInputs, priceMap, 'assetType');
       const pnl = calculateUnrealizedPnL(posInputs, priceMap);
 
@@ -78,7 +82,8 @@ export class InvestPortfolioService {
 
   async getPositions(userId: string) {
     return wrapAsync(this.logger, 'getPositions', async () => {
-      const positions = await this.portfolioQuery.findPositionsWithAsset(userId);
+      const positions =
+        await this.portfolioQuery.findPositionsWithAsset(userId);
       return positions.map((p) => ({
         assetId: p.assetId.toString(),
         assetCode: p.asset.code,
@@ -90,20 +95,33 @@ export class InvestPortfolioService {
     });
   }
 
-  async getTransactions(userId: string, limit: number = 50, offset: number = 0) {
+  async getTransactions(userId: string, limit: number = 50, cursor?: bigint) {
     return wrapAsync(this.logger, 'getTransactions', async () => {
-      const transactions = await this.portfolioQuery.findTransactions(userId, limit, offset);
-      return transactions.map((t) => ({
-        id: t.id.toString(),
-        assetId: t.assetId.toString(),
-        assetCode: t.asset.code,
-        assetName: t.asset.name,
-        side: t.side,
-        quantity: t.quantity,
-        pricePerUnit: t.pricePerUnit,
-        totalAmount: t.totalAmount,
-        createdAt: t.createdAt.toISOString(),
-      }));
+      const transactions = await this.portfolioQuery.findTransactions(
+        userId,
+        limit,
+        cursor,
+      );
+
+      const nextCursor =
+        transactions.length === limit
+          ? transactions[transactions.length - 1].id
+          : null;
+
+      return {
+        data: transactions.map((t) => ({
+          id: t.id.toString(),
+          assetId: t.assetId.toString(),
+          assetCode: t.asset.code,
+          assetName: t.asset.name,
+          side: t.side,
+          quantity: t.quantity,
+          pricePerUnit: t.pricePerUnit,
+          totalAmount: t.totalAmount,
+          createdAt: t.createdAt.toISOString(),
+        })),
+        nextCursor: nextCursor?.toString() ?? null,
+      };
     });
   }
 }

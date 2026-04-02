@@ -1,10 +1,24 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import { CommitmentQuery } from '#budget-simulation/queries/commitment.query.js';
-import { JarCode, SpendModeCode } from '#budget-simulation/budget-simulation.enum.js';
-import type { WeeklySpendSummary, WeeklySpendResult } from '#budget-simulation/domain/index.js';
-import { buildJarAvailableMap, computeWeeklySpend, jarAvailable } from '#budget-simulation/domain/index.js';
+import {
+  JarCode,
+  SpendModeCode,
+} from '#budget-simulation/budget-simulation.enum.js';
+import type {
+  WeeklySpendSummary,
+  WeeklySpendResult,
+} from '#budget-simulation/domain/index.js';
+import {
+  buildJarAvailableMap,
+  computeWeeklySpend,
+  jarAvailable,
+} from '#budget-simulation/domain/index.js';
 import type { BudgetSimulationModuleConfig } from '#budget-simulation/budget-simulation.constant.js';
 import { TxClient } from '#app/prisma/transaction.runner.js';
 
@@ -123,7 +137,13 @@ export class MonthSpendService {
     config: BudgetSimulationModuleConfig,
     tx?: TxClient,
   ): Promise<{
-    entries: { type: string; jar: string; amount: number; jarBalance: number; label: string }[];
+    entries: {
+      type: string;
+      jar: string;
+      amount: number;
+      jarBalance: number;
+      label: string;
+    }[];
     weeklySpend: WeeklySpendSummary;
     learningXpDelta: number;
   }> {
@@ -139,7 +159,7 @@ export class MonthSpendService {
     const spendModeCode = month.spendModeCode ?? SpendModeCode.normal;
     const rate = await this.getSpendModeRate(spendModeCode);
     const result = this.computeWeeklySpend(
-      { ...month, runId: month.runId!, id: month.id },
+      { ...month, runId: month.runId, id: month.id },
       jars,
       rate,
       nextWeek,
@@ -150,7 +170,11 @@ export class MonthSpendService {
     for (const op of result.spendOps) {
       await this.addSpendLog(monthId, op.jarCode, op.amount, 0, 0, tx);
     }
-    return { entries: result.entries, weeklySpend: result.weeklySpend, learningXpDelta: result.learningXpDelta };
+    return {
+      entries: result.entries,
+      weeklySpend: result.weeklySpend,
+      learningXpDelta: result.learningXpDelta,
+    };
   }
 
   /**

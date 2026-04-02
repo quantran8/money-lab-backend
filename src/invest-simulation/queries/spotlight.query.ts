@@ -30,4 +30,39 @@ export class InvestSpotlightQuery {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /** Assets eligible for spotlight: no active spotlight AND past cooldown. */
+  async findEligibleAssets(
+    currentTick: bigint,
+    assetIds: bigint[],
+  ): Promise<
+    Array<{
+      id: bigint;
+      sectorId: number;
+      category: string | null;
+      attentionSensitivity: string;
+    }>
+  > {
+    return this.prisma.asset.findMany({
+      where: {
+        isActive: true,
+        id: { in: assetIds },
+        spotlightInstances: {
+          none: {
+            OR: [
+              { isActive: true },
+              { cooldownUntilTick: { gt: currentTick } },
+            ],
+          },
+        },
+      },
+      select: {
+        id: true,
+        sectorId: true,
+        category: true,
+        attentionSensitivity: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+  }
 }

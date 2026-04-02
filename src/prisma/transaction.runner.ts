@@ -16,7 +16,12 @@ export type TxClient = Prisma.TransactionClient;
 export class TransactionRunner {
   constructor(private readonly prisma: PrismaService) {}
 
-  async run<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(fn);
+  async run<T>(
+    fn: (tx: TxClient) => Promise<T>,
+    options?: { timeout?: number },
+  ): Promise<T> {
+    return this.prisma.$transaction(fn, {
+      timeout: options?.timeout,
+    });
   }
 }

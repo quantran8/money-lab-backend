@@ -288,16 +288,24 @@ export function analyzeRun(input: AnalyzeRunInput): RunAnalysisResult {
     allocPcts.length > 0
       ? {
           fun: parseFloat(
-            (allocPcts.reduce((s, v) => s + v.fun, 0) / allocPcts.length).toFixed(4),
+            (
+              allocPcts.reduce((s, v) => s + v.fun, 0) / allocPcts.length
+            ).toFixed(4),
           ),
           learning: parseFloat(
-            (allocPcts.reduce((s, v) => s + v.learning, 0) / allocPcts.length).toFixed(4),
+            (
+              allocPcts.reduce((s, v) => s + v.learning, 0) / allocPcts.length
+            ).toFixed(4),
           ),
           giving: parseFloat(
-            (allocPcts.reduce((s, v) => s + v.giving, 0) / allocPcts.length).toFixed(4),
+            (
+              allocPcts.reduce((s, v) => s + v.giving, 0) / allocPcts.length
+            ).toFixed(4),
           ),
           future: parseFloat(
-            (allocPcts.reduce((s, v) => s + v.future, 0) / allocPcts.length).toFixed(4),
+            (
+              allocPcts.reduce((s, v) => s + v.future, 0) / allocPcts.length
+            ).toFixed(4),
           ),
         }
       : { fun: 0, learning: 0, giving: 0, future: 0 };
@@ -306,7 +314,11 @@ export function analyzeRun(input: AnalyzeRunInput): RunAnalysisResult {
     futureYou: {
       series: futureSeries,
       total: finalFutureYouSavings,
-      insight: buildFutureYouInsight(finalFutureYouSavings, avgMonthlyIncome, months.length),
+      insight: buildFutureYouInsight(
+        finalFutureYouSavings,
+        avgMonthlyIncome,
+        months.length,
+      ),
     },
     structuralLoad: {
       average: loadAvg,
@@ -314,7 +326,12 @@ export function analyzeRun(input: AnalyzeRunInput): RunAnalysisResult {
     },
     allocation: {
       categories: ['fun', 'learning', 'giving', 'future'],
-      values: [avgAlloc.fun, avgAlloc.learning, avgAlloc.giving, avgAlloc.future],
+      values: [
+        avgAlloc.fun,
+        avgAlloc.learning,
+        avgAlloc.giving,
+        avgAlloc.future,
+      ],
       insight: buildAllocationInsight(avgAlloc),
     },
   };

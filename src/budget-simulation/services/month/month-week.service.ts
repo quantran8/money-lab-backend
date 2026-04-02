@@ -5,11 +5,17 @@ import {
   Logger,
 } from '@nestjs/common';
 import { wrapAsync } from '#common/utils/async.utils.js';
-import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
+import {
+  clampHi,
+  clampLqi,
+} from '#app/budget-simulation/budget-simulation.helpers.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
-import { JarCode, SpendModeCode } from '#budget-simulation/budget-simulation.enum.js';
+import {
+  JarCode,
+  SpendModeCode,
+} from '#budget-simulation/budget-simulation.enum.js';
 import {
   END_OF_MONTH_WEEK,
   MAX_EVENTS_PER_WEEK,
@@ -18,7 +24,10 @@ import {
   FORCED_REST_HI_RECOVERY,
   DEFAULT_HI_FALLBACK,
 } from '#budget-simulation/budget-simulation.constant.js';
-import { jarAvailable, computeJobProgress } from '#budget-simulation/domain/index.js';
+import {
+  jarAvailable,
+  computeJobProgress,
+} from '#budget-simulation/domain/index.js';
 import type { JobProgressResult } from '#budget-simulation/domain/index.js';
 import { MonthSpendService } from './month-spend.service';
 import { MonthEventService } from './month-event.service';
@@ -176,7 +185,9 @@ export class MonthWeekService {
       const hiRecoveryFromForcedRest = FORCED_REST_HI_RECOVERY;
 
       const idx = month.indexResolution;
-      const currentHi = idx ? Number(idx.hiEnd ?? idx.hiStart ?? DEFAULT_HI_FALLBACK) : DEFAULT_HI_FALLBACK;
+      const currentHi = idx
+        ? Number(idx.hiEnd ?? idx.hiStart ?? DEFAULT_HI_FALLBACK)
+        : DEFAULT_HI_FALLBACK;
       const didForcedRest = !!(
         idx &&
         idx.forcedRestWeek == null &&
@@ -254,21 +265,19 @@ export class MonthWeekService {
           );
         }
 
-        const spendWriteOps: Promise<unknown>[] = spendResult.spendOps.map((op) =>
-          this.spendService.addSpendLog(
-            monthIdBig,
-            op.jarCode,
-            op.amount,
-            0,
-            0,
-            tx,
-          ),
+        const spendWriteOps: Promise<unknown>[] = spendResult.spendOps.map(
+          (op) =>
+            this.spendService.addSpendLog(
+              monthIdBig,
+              op.jarCode,
+              op.amount,
+              0,
+              0,
+              tx,
+            ),
         );
 
-        if (
-          spendResult.learningXpDelta > 0 &&
-          month.run.jobStateId != null
-        ) {
+        if (spendResult.learningXpDelta > 0 && month.run.jobStateId != null) {
           spendWriteOps.push(
             this.runRepository.incrementUserJobStateXpBounded(
               month.run.jobStateId,

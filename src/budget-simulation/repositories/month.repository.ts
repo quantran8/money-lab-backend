@@ -15,10 +15,7 @@ export class BudgetMonthRepository {
     return tx ?? this.prisma;
   }
 
-  async createMonth(
-    data: Prisma.RunMonthUncheckedCreateInput,
-    tx?: TxClient,
-  ) {
+  async createMonth(data: Prisma.RunMonthUncheckedCreateInput, tx?: TxClient) {
     return this.client(tx).runMonth.create({ data });
   }
 

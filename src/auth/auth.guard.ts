@@ -7,7 +7,7 @@ import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
  */
 @Injectable()
 export class AuthGuard extends PassportAuthGuard('supabase') {
-    getRequest(context: ExecutionContext) {
-        return context.switchToHttp().getRequest();
-    }
+  getRequest(context: ExecutionContext) {
+    return context.switchToHttp().getRequest();
+  }
 }

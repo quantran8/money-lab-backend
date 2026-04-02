@@ -15,7 +15,6 @@ export async function wrapAsync<T>(
     const elapsed = Date.now() - start;
     logger.log(`${methodName} took ${elapsed}ms`);
     return result;
-    
   } catch (err) {
     if (err instanceof HttpException) throw err;
     const msg = err instanceof Error ? err.message : String(err);

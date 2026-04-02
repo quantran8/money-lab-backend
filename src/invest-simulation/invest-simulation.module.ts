@@ -42,6 +42,7 @@ import { InvestArcService } from './services/arc.service.js';
 import { InvestPricingService } from './services/pricing.service.js';
 import { InvestNewsService } from './services/news.service.js';
 import { InvestTickService } from './services/tick.service.js';
+import { InvestTickScheduler } from './services/tick-scheduler.service.js';
 import { InvestPolicyService } from './services/policy.service.js';
 import { BehaviorWindowService } from './services/behavior-window.service.js';
 import { InvestBehaviorEvaluationService } from './services/behavior-evaluation.service.js';
@@ -49,6 +50,7 @@ import { InvestStabilityScoreService } from './services/stability-score.service.
 import { InvestReflectionService } from './services/reflection.service.js';
 import { MissionService } from './services/mission.service.js';
 import { InvestReportService } from './services/report.service.js';
+import { InvestSpawnService } from './services/spawn.service.js';
 
 // Facade
 import { InvestSimulationService } from './invest-simulation.service.js';
@@ -95,6 +97,7 @@ import { InvestSimulationService } from './invest-simulation.service.js';
     InvestPricingService,
     InvestNewsService,
     InvestTickService,
+    InvestTickScheduler,
     InvestPolicyService,
     BehaviorWindowService,
     InvestBehaviorEvaluationService,
@@ -102,6 +105,7 @@ import { InvestSimulationService } from './invest-simulation.service.js';
     InvestReflectionService,
     MissionService,
     InvestReportService,
+    InvestSpawnService,
     // Facade
     InvestSimulationService,
   ],

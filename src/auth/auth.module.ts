@@ -3,8 +3,8 @@ import { PassportModule } from '@nestjs/passport';
 import { SupabaseStrategy } from './supabase.strategy';
 
 @Module({
-    imports: [PassportModule],
-    providers: [SupabaseStrategy],
-    exports: [SupabaseStrategy],
+  imports: [PassportModule],
+  providers: [SupabaseStrategy],
+  exports: [SupabaseStrategy],
 })
-export class AuthModule { }
+export class AuthModule {}

@@ -22,7 +22,9 @@ export function resolveBaseJobIncome(
 /**
  * Next month BUDGET_RUN_MONTHS.income = resolved base + previous month's overtime_income_earned.
  */
-export function calculateMonthIncome(params: CalculateMonthIncomeParams): number {
+export function calculateMonthIncome(
+  params: CalculateMonthIncomeParams,
+): number {
   const base = resolveBaseJobIncome(params.job, params.jobLevel);
   return base + Math.max(0, params.previousMonthOvertimeIncomeEarned);
 }

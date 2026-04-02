@@ -37,24 +37,31 @@ export class InvestController {
     return this.investService.getSectors();
   }
 
-
-
   // ── Assets ───────────────────────────────────────────────────────
 
   @Get('assets')
   getAssets(
     @Query('sectorId') sectorId?: string,
     @Query('search') search?: string,
+    @Query('category') category?: string,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.investService.getAssets(
       {
         sectorId: sectorId ? parseInt(sectorId, 10) : undefined,
         search: search || undefined,
+        category: category || undefined,
       },
       limit ? parseInt(limit, 10) : undefined,
-      offset ? parseInt(offset, 10) : undefined,
+      cursor ? BigInt(cursor) : undefined,
+    );
+  }
+
+  @Get('assets/categories')
+  getAssetCategories(@Query('sectorId') sectorId?: string) {
+    return this.investService.getAssetCategories(
+      sectorId ? parseInt(sectorId, 10) : undefined,
     );
   }
 
@@ -79,12 +86,12 @@ export class InvestController {
   getTransactions(
     @Request() req: { user?: { id: string } },
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('cursor') cursor?: string,
   ) {
     return this.investService.getTransactions(
       getUserId(req),
       limit ? parseInt(limit, 10) : undefined,
-      offset ? parseInt(offset, 10) : undefined,
+      cursor ? BigInt(cursor) : undefined,
     );
   }
 
@@ -117,9 +124,13 @@ export class InvestController {
   // ── News ─────────────────────────────────────────────────────────
 
   @Get('news')
-  getNewsFeed(@Query('limit') limit?: string) {
+  getNewsFeed(
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
     return this.investService.getNewsFeed(
       limit ? parseInt(limit, 10) : undefined,
+      cursor ? BigInt(cursor) : undefined,
     );
   }
 

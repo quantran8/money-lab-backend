@@ -1,4 +1,5 @@
 import { Module, Global } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SupabaseService } from './supabase/supabase.service';
@@ -10,9 +11,15 @@ import { InvestModule } from './invest-simulation/invest-simulation.module';
 
 @Global()
 @Module({
-  imports: [AuthModule, LearnModule, BudgetModule, InvestModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    AuthModule,
+    LearnModule,
+    BudgetModule,
+    InvestModule,
+  ],
   controllers: [AppController],
   providers: [AppService, SupabaseService, PrismaService],
   exports: [SupabaseService, PrismaService],
 })
-export class AppModule { }
+export class AppModule {}

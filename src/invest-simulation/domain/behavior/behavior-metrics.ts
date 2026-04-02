@@ -18,9 +18,15 @@ export interface BehaviorInput {
   /** Portfolio value at window end. */
   portfolioValueEnd: number;
   /** Positions at window start: { assetId → { quantity, sectorCode, assetType } }. */
-  positionsStart: Record<string, { quantity: number; sectorCode: string; assetType: string }>;
+  positionsStart: Record<
+    string,
+    { quantity: number; sectorCode: string; assetType: string }
+  >;
   /** Positions at window end. */
-  positionsEnd: Record<string, { quantity: number; sectorCode: string; assetType: string }>;
+  positionsEnd: Record<
+    string,
+    { quantity: number; sectorCode: string; assetType: string }
+  >;
   /** Tick indices of news items during the window. */
   newsTickIds: bigint[];
   /** Window duration in ticks. */
@@ -41,8 +47,12 @@ export interface BehaviorMetrics {
  * Higher = more active trading. Range roughly 0–10+.
  */
 export function computeTurnover(input: BehaviorInput): number {
-  const totalVolume = input.transactions.reduce((sum, t) => sum + t.totalAmount, 0);
-  const avgPortfolio = (input.portfolioValueStart + input.portfolioValueEnd) / 2;
+  const totalVolume = input.transactions.reduce(
+    (sum, t) => sum + t.totalAmount,
+    0,
+  );
+  const avgPortfolio =
+    (input.portfolioValueStart + input.portfolioValueEnd) / 2;
   if (avgPortfolio <= 0) return 0;
   return totalVolume / avgPortfolio;
 }
@@ -100,7 +110,9 @@ export function computeVolatilityChasing(input: BehaviorInput): number {
   if (input.transactions.length === 0) return 0;
 
   const newsTickSet = new Set(input.newsTickIds.map(Number));
-  const chaseTrades = input.transactions.filter((t) => newsTickSet.has(Number(t.tickId)));
+  const chaseTrades = input.transactions.filter((t) =>
+    newsTickSet.has(Number(t.tickId)),
+  );
   return chaseTrades.length / input.transactions.length;
 }
 
@@ -108,7 +120,10 @@ export function computeVolatilityChasing(input: BehaviorInput): number {
  * Compute exposure breakdown at window end.
  */
 function computeExposure(
-  positions: Record<string, { quantity: number; sectorCode: string; assetType: string }>,
+  positions: Record<
+    string,
+    { quantity: number; sectorCode: string; assetType: string }
+  >,
   groupBy: 'sectorCode' | 'assetType',
 ): Record<string, number> {
   const groups: Record<string, number> = {};

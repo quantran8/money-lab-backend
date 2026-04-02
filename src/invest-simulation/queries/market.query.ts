@@ -32,14 +32,20 @@ export class InvestMarketQuery {
   }
 
   /** Latest single price for one asset. */
-  async findLatestPriceForAsset(assetId: bigint, tickId: bigint): Promise<PricePointRow | null> {
+  async findLatestPriceForAsset(
+    assetId: bigint,
+    tickId: bigint,
+  ): Promise<PricePointRow | null> {
     return this.prisma.assetPricePoint.findFirst({
       where: { assetId, tickId },
     });
   }
 
   /** Price history for a single asset (most recent first). */
-  async findPriceHistory(assetId: bigint, limit: number): Promise<PricePointRow[]> {
+  async findPriceHistory(
+    assetId: bigint,
+    limit: number,
+  ): Promise<PricePointRow[]> {
     return this.prisma.assetPricePoint.findMany({
       where: { assetId },
       orderBy: { tickId: 'desc' },

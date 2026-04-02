@@ -9,7 +9,9 @@ export type TickWithWorldStateRow = Prisma.MarketTickGetPayload<{
 }>;
 
 /** Price point row. */
-export type PricePointRow = Prisma.AssetPricePointGetPayload<Record<string, never>>;
+export type PricePointRow = Prisma.AssetPricePointGetPayload<
+  Record<string, never>
+>;
 
 /** Price point with asset info. */
 export type PricePointWithAssetRow = Prisma.AssetPricePointGetPayload<{
@@ -17,4 +19,6 @@ export type PricePointWithAssetRow = Prisma.AssetPricePointGetPayload<{
 }>;
 
 /** World state row. */
-export type WorldStateRow = Prisma.WorldStateAtTickGetPayload<Record<string, never>>;
+export type WorldStateRow = Prisma.WorldStateAtTickGetPayload<
+  Record<string, never>
+>;

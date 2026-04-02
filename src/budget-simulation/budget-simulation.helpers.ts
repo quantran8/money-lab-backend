@@ -11,7 +11,6 @@ import {
 export type LqiState = 'stable' | 'compressed' | 'strained';
 type JarType = 'fun' | 'learning' | 'give';
 
-
 /**
  * Resolves numeric LQI to player-facing state using module index_rules thresholds.
  * stable: LQI >= stable_min; compressed: between compressed_min and compressed_max; else strained.
@@ -36,10 +35,7 @@ export function clampHi(
 ): number {
   const r = config.indexRules;
   if (!r) return Math.max(0, Math.min(100, rawHi));
-  return Math.min(
-    r.hiCap,
-    Math.max(r.hiFloor, Math.round(rawHi)),
-  );
+  return Math.min(r.hiCap, Math.max(r.hiFloor, Math.round(rawHi)));
 }
 
 /**
@@ -58,19 +54,19 @@ export function clampLqi(
  * Returns a deterministic float in [0, 1) from seed string.
  */
 export function deterministicRandom(seed: string): number {
-    const hash = createHash('md5').update(seed).digest('hex');
-    const first16 = hash.substring(0, 16);
-    const i64 = BigInt(`0x${first16}`);
-    const two64 = BigInt('18446744073709551616');
-    return Number(i64) / Number(two64);
+  const hash = createHash('md5').update(seed).digest('hex');
+  const first16 = hash.substring(0, 16);
+  const i64 = BigInt(`0x${first16}`);
+  const two64 = BigInt('18446744073709551616');
+  return Number(i64) / Number(two64);
 }
 
 /**
  * Returns a deterministic 32-bit integer from seed string.
  */
 export function seedInt(seed: string): number {
-    const hash = createHash('md5').update(seed).digest('hex');
-    return parseInt(hash.substring(0, 8), 16) | 0;
+  const hash = createHash('md5').update(seed).digest('hex');
+  return parseInt(hash.substring(0, 8), 16) | 0;
 }
 
 /**
@@ -89,7 +85,7 @@ function getLearningTier(
 
 export function genAutoSpendLabel(
   seed: string,
-  jarType: String,
+  jarType: string,
   amount: number,
   spendMode: string,
   weekIndex: number,
@@ -299,22 +295,26 @@ const SEASONAL_BILL_OVERRIDES: Record<
   1: {
     minPct: 0.05,
     maxPct: 0.12,
-    reason: 'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
+    reason:
+      'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
   },
   2: {
     minPct: 0.05,
     maxPct: 0.12,
-    reason: 'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
+    reason:
+      'Thời tiết lạnh — hệ thống sưởi hoạt động nhiều hơn, hóa đơn điện tăng.',
   },
   5: {
     minPct: 0.06,
     maxPct: 0.15,
-    reason: 'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
+    reason:
+      'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
   },
   6: {
     minPct: 0.06,
     maxPct: 0.15,
-    reason: 'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
+    reason:
+      'Mùa hè nóng — dùng điều hòa và nước nhiều hơn, hóa đơn điện & nước tăng.',
   },
 };
 
@@ -324,24 +324,23 @@ const SEASONAL_BILL_OVERRIDES: Record<
  * Returns actual amount, delta, and optional reason for the increase.
  */
 export function computeBillsFinal(
-    runId: number,
-    monthIndex: number,
-    estimated: number
+  runId: number,
+  monthIndex: number,
+  estimated: number,
 ): { estimated: number; actual: number; delta: number; reason: string | null } {
-    const seed = `${runId}:${monthIndex}:bills`;
-    const r = deterministicRandom(seed);
+  const seed = `${runId}:${monthIndex}:bills`;
+  const r = deterministicRandom(seed);
 
-    const seasonal = SEASONAL_BILL_OVERRIDES[monthIndex];
-    if (seasonal) {
-      const factor = seasonal.minPct + r * (seasonal.maxPct - seasonal.minPct);
-      const actual = Math.round(estimated * (1 + factor));
-      const delta = actual - estimated;
-      return { estimated, actual, delta, reason: seasonal.reason };
-    }
-
-    const factor = (r - BILL_VARIANCE_CENTER) * BILL_VARIANCE_RANGE;
+  const seasonal = SEASONAL_BILL_OVERRIDES[monthIndex];
+  if (seasonal) {
+    const factor = seasonal.minPct + r * (seasonal.maxPct - seasonal.minPct);
     const actual = Math.round(estimated * (1 + factor));
     const delta = actual - estimated;
-    return { estimated, actual, delta, reason: null };
-}
+    return { estimated, actual, delta, reason: seasonal.reason };
+  }
 
+  const factor = (r - BILL_VARIANCE_CENTER) * BILL_VARIANCE_RANGE;
+  const actual = Math.round(estimated * (1 + factor));
+  const delta = actual - estimated;
+  return { estimated, actual, delta, reason: null };
+}

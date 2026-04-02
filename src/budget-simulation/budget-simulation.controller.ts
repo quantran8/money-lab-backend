@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Request, UseGuards, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Request,
+  UseGuards,
+  Param,
+} from '@nestjs/common';
 import { BudgetSimulationService } from './budget-simulation.service';
 import {
   StartRunDto,
@@ -9,7 +17,6 @@ import {
 } from './dto';
 import { AuthGuard } from '#app/auth/auth.guard.js';
 import { getUserId } from '#common/utils/auth.utils.js';
-
 
 @Controller('budget-simulation')
 @UseGuards(AuthGuard)

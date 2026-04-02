@@ -41,13 +41,31 @@ export interface GeneratedReflection {
 }
 
 /** Check if a snapshot matches a template condition. */
-function matchesCondition(snapshot: BehaviorSnapshot, cond: ReflectionCondition): boolean {
-  if (cond.minTurnover != null && snapshot.turnoverScore < cond.minTurnover) return false;
-  if (cond.maxTurnover != null && snapshot.turnoverScore > cond.maxTurnover) return false;
-  if (cond.minVolatilityChasing != null && snapshot.volatilityChasingScore < cond.minVolatilityChasing) return false;
-  if (cond.minConcentrationChange != null && snapshot.concentrationChange < cond.minConcentrationChange) return false;
-  if (cond.maxReactionTime != null && snapshot.reactionTimeScore > cond.maxReactionTime) return false;
-  if (cond.windowType != null && snapshot.windowType !== cond.windowType) return false;
+function matchesCondition(
+  snapshot: BehaviorSnapshot,
+  cond: ReflectionCondition,
+): boolean {
+  if (cond.minTurnover != null && snapshot.turnoverScore < cond.minTurnover)
+    return false;
+  if (cond.maxTurnover != null && snapshot.turnoverScore > cond.maxTurnover)
+    return false;
+  if (
+    cond.minVolatilityChasing != null &&
+    snapshot.volatilityChasingScore < cond.minVolatilityChasing
+  )
+    return false;
+  if (
+    cond.minConcentrationChange != null &&
+    snapshot.concentrationChange < cond.minConcentrationChange
+  )
+    return false;
+  if (
+    cond.maxReactionTime != null &&
+    snapshot.reactionTimeScore > cond.maxReactionTime
+  )
+    return false;
+  if (cond.windowType != null && snapshot.windowType !== cond.windowType)
+    return false;
   return true;
 }
 
@@ -71,7 +89,7 @@ export function generateReflections(
   const results: GeneratedReflection[] = [];
 
   for (const tmpl of templates) {
-    const cond = tmpl.condition as ReflectionCondition;
+    const cond = tmpl.condition;
     if (matchesCondition(snapshot, cond)) {
       results.push({
         templateId: tmpl.id,

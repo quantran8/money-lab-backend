@@ -20,7 +20,9 @@ export class ModuleQuery {
    * Loads module by id and returns full budget-simulation config in camelCase.
    * Returns merged default + stored config; null if module not found.
    */
-  async getModuleConfig(moduleId: number): Promise<BudgetSimulationModuleConfig> {
+  async getModuleConfig(
+    moduleId: number,
+  ): Promise<BudgetSimulationModuleConfig> {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
       select: { config: true },

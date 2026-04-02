@@ -63,9 +63,7 @@ export class RunQuery {
   }
 
   /** Run by id with jobState and job (for startMonth). */
-  async findRunWithJobState(
-    runId: bigint,
-  ): Promise<RunWithJobStateRow | null> {
+  async findRunWithJobState(runId: bigint): Promise<RunWithJobStateRow | null> {
     return this.prisma.run.findUnique({
       where: { id: runId },
       include: {

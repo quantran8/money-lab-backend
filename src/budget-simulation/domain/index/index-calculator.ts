@@ -61,7 +61,6 @@ export interface WeeklyIndexResult {
   weeklyProgress: WeeklyIndexProgressItem;
 }
 
-
 /**
  * Returns baseline and fun efficiency (0-100) for a LQI state from config.
  */
@@ -106,8 +105,11 @@ export function resolveWeek(input: WeeklyIndexInput): WeeklyIndexResult {
 
   let funBonusRaw = 0;
   if (weeklySpend.fun >= FUN_SPEND_THRESHOLD_FULL) funBonusRaw = FUN_BONUS_FULL;
-  else if (weeklySpend.fun >= FUN_SPEND_THRESHOLD_HALF) funBonusRaw = FUN_BONUS_HALF;
-  const weeklyFunRecoveryBonus = Math.round(funBonusRaw * (funPct / RECOVERY_EFFICIENCY_DIVISOR));
+  else if (weeklySpend.fun >= FUN_SPEND_THRESHOLD_HALF)
+    funBonusRaw = FUN_BONUS_HALF;
+  const weeklyFunRecoveryBonus = Math.round(
+    funBonusRaw * (funPct / RECOVERY_EFFICIENCY_DIVISOR),
+  );
   const stressEffect = 0;
 
   const hiNetChange =

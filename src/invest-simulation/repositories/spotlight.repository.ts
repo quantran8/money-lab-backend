@@ -30,7 +30,12 @@ export class InvestSpotlightRepository {
     });
   }
 
-  async deactivateInstance(id: bigint, endedAtTick: bigint, cooldownUntilTick: bigint, tx?: TxClient) {
+  async deactivateInstance(
+    id: bigint,
+    endedAtTick: bigint,
+    cooldownUntilTick: bigint,
+    tx?: TxClient,
+  ) {
     return this.client(tx).assetSpotlightInstance.update({
       where: { id },
       data: { isActive: false, endedAtTick, cooldownUntilTick },

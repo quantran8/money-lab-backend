@@ -10,34 +10,35 @@ import { SupabaseService } from '../supabase/supabase.service';
  */
 @Injectable()
 export class SupabaseStrategy extends PassportStrategy(Strategy, 'supabase') {
-    constructor(private readonly supabaseService: SupabaseService) {
-        super();
-    }
+  constructor(private readonly supabaseService: SupabaseService) {
+    super();
+  }
 
-    validate(): Promise<unknown> {
-        return Promise.resolve(undefined);
-    }
+  validate(): Promise<unknown> {
+    return Promise.resolve(undefined);
+  }
 
-    authenticate(req: { headers?: { authorization?: string } }): void {
-        const authHeader = req.headers?.authorization;
-        const token =
-            authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-        if (!token) {
-            this.fail({ message: 'Missing authorization' }, 401);
-            return;
+  authenticate(req: { headers?: { authorization?: string } }): void {
+    const authHeader = req.headers?.authorization;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : null;
+    if (!token) {
+      this.fail({ message: 'Missing authorization' }, 401);
+      return;
+    }
+    this.supabaseService
+      .getClient()
+      .auth.getUser(token)
+      .then(({ data: { user }, error }) => {
+        if (error || !user) {
+          this.fail({ message: 'Invalid token' }, 401);
+          return;
         }
-        this.supabaseService
-            .getClient()
-            .auth.getUser(token)
-            .then(({ data: { user }, error }) => {
-                if (error || !user) {
-                    this.fail({ message: 'Invalid token' }, 401);
-                    return;
-                }
-                this.success(user, {});
-            })
-            .catch((err: Error) => {
-                this.fail({ message: err?.message ?? 'Invalid token' }, 401);
-            });
-    }
+        this.success(user, {});
+      })
+      .catch((err: Error) => {
+        this.fail({ message: err?.message ?? 'Invalid token' }, 401);
+      });
+  }
 }

@@ -13,7 +13,10 @@ export class InvestReportQuery {
     });
   }
 
-  async findReports(userId: string, limit: number = 10): Promise<SimReportRow[]> {
+  async findReports(
+    userId: string,
+    limit: number = 10,
+  ): Promise<SimReportRow[]> {
     return this.prisma.simReport.findMany({
       where: { userId },
       orderBy: { generatedAt: 'desc' },

@@ -21,7 +21,9 @@ import { TransactionRunner } from '#app/prisma/transaction.runner.js';
  */
 @Injectable()
 export class BudgetSimulationRunCommitmentService {
-  private readonly logger = new Logger(BudgetSimulationRunCommitmentService.name);
+  private readonly logger = new Logger(
+    BudgetSimulationRunCommitmentService.name,
+  );
 
   constructor(
     private readonly transactionRunner: TransactionRunner,
@@ -104,14 +106,15 @@ export class BudgetSimulationRunCommitmentService {
         (c.effectiveToMonthIndex === null ||
           c.effectiveToMonthIndex >= monthIndex);
 
-      const workingCommitments: RunCommitmentWorkingRow[] =
-        run.commitments.map((c) => ({
+      const workingCommitments: RunCommitmentWorkingRow[] = run.commitments.map(
+        (c) => ({
           commitmentTemplateId: c.commitmentTemplateId,
           selectedAmount: c.selectedAmount,
           effectiveFromMonthIndex: c.effectiveFromMonthIndex,
           effectiveToMonthIndex: c.effectiveToMonthIndex,
           template: { category: c.template.category },
-        }));
+        }),
+      );
 
       const syncClosedAtCurrent = (ids: bigint[]) => {
         for (const id of ids) {

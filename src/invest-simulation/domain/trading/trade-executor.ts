@@ -47,16 +47,34 @@ export function computeBuyFill(input: BuyFillInput): BuyFillResult {
   const { availableCredits, pricePerUnit, quantity } = input;
 
   if (quantity <= 0) {
-    return { valid: false, reason: 'Quantity must be greater than 0', totalCost: 0, quantity: 0, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Quantity must be greater than 0',
+      totalCost: 0,
+      quantity: 0,
+      pricePerUnit,
+    };
   }
   if (pricePerUnit <= 0) {
-    return { valid: false, reason: 'Price must be greater than 0', totalCost: 0, quantity: 0, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Price must be greater than 0',
+      totalCost: 0,
+      quantity: 0,
+      pricePerUnit,
+    };
   }
 
   const totalCost = pricePerUnit * quantity;
 
   if (totalCost > availableCredits) {
-    return { valid: false, reason: 'Insufficient credits', totalCost, quantity, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Insufficient credits',
+      totalCost,
+      quantity,
+      pricePerUnit,
+    };
   }
 
   return { valid: true, totalCost, quantity, pricePerUnit };
@@ -66,13 +84,31 @@ export function computeSellFill(input: SellFillInput): SellFillResult {
   const { heldQuantity, pricePerUnit, quantity } = input;
 
   if (quantity <= 0) {
-    return { valid: false, reason: 'Quantity must be greater than 0', totalProceeds: 0, quantity: 0, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Quantity must be greater than 0',
+      totalProceeds: 0,
+      quantity: 0,
+      pricePerUnit,
+    };
   }
   if (pricePerUnit <= 0) {
-    return { valid: false, reason: 'Price must be greater than 0', totalProceeds: 0, quantity: 0, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Price must be greater than 0',
+      totalProceeds: 0,
+      quantity: 0,
+      pricePerUnit,
+    };
   }
   if (quantity > heldQuantity) {
-    return { valid: false, reason: 'Insufficient quantity held', totalProceeds: 0, quantity, pricePerUnit };
+    return {
+      valid: false,
+      reason: 'Insufficient quantity held',
+      totalProceeds: 0,
+      quantity,
+      pricePerUnit,
+    };
   }
 
   const totalProceeds = pricePerUnit * quantity;

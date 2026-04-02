@@ -22,27 +22,34 @@ export class InvestNewsService {
 
   // ── Public read APIs ──────────────────────────────────────────
 
-  async getNewsFeed(limit: number = 20) {
+  async getNewsFeed(limit: number = 20, cursor?: bigint) {
     return wrapAsync(this.logger, 'getNewsFeed', async () => {
-      const items = await this.newsQuery.findRecent(limit);
-      return items.map((n) => ({
-        id: n.id.toString(),
-        tickId: n.tickId.toString(),
-        title: n.title,
-        body: n.body,
-        tone: n.tone,
-        intensity: Number(n.intensity),
-        narrativeTag: n.narrativeTag,
-        createdAt: n.createdAt.toISOString(),
-        assetImpacts: n.assetImpacts.map((ai) => ({
-          assetId: ai.assetId.toString(),
-          impactPct: Number(ai.impactPct),
+      const items = await this.newsQuery.findRecent(limit, cursor);
+
+      const nextCursor =
+        items.length === limit ? items[items.length - 1].id : null;
+
+      return {
+        data: items.map((n) => ({
+          id: n.id.toString(),
+          tickId: n.tickId.toString(),
+          title: n.title,
+          body: n.body,
+          tone: n.tone,
+          intensity: Number(n.intensity),
+          narrativeTag: n.narrativeTag,
+          createdAt: n.createdAt.toISOString(),
+          assetImpacts: n.assetImpacts.map((ai) => ({
+            assetId: ai.assetId.toString(),
+            impactPct: Number(ai.impactPct),
+          })),
+          sectorImpacts: n.sectorImpacts.map((si) => ({
+            sectorId: si.sectorId,
+            impactPct: Number(si.impactPct),
+          })),
         })),
-        sectorImpacts: n.sectorImpacts.map((si) => ({
-          sectorId: si.sectorId,
-          impactPct: Number(si.impactPct),
-        })),
-      }));
+        nextCursor: nextCursor?.toString() ?? null,
+      };
     });
   }
 
@@ -135,7 +142,8 @@ export class InvestNewsService {
 
       // Aggregate for price generation
       for (const [code, impact] of Object.entries(item.sectorImpacts)) {
-        aggregatedSectorImpacts[code] = (aggregatedSectorImpacts[code] ?? 0) + impact;
+        aggregatedSectorImpacts[code] =
+          (aggregatedSectorImpacts[code] ?? 0) + impact;
       }
     }
 

@@ -25,7 +25,8 @@ const TIER_THRESHOLDS: Array<{ min: number; tier: string }> = [
 ];
 
 export function computeScore(input: ScoreInput): ScoreResult {
-  const wealthPoints = Math.round(input.totalPortfolioValue * input.stabilityFactor * 100) / 100;
+  const wealthPoints =
+    Math.round(input.totalPortfolioValue * input.stabilityFactor * 100) / 100;
 
   let wealthTier = 'beginner';
   for (const t of TIER_THRESHOLDS) {

@@ -219,7 +219,7 @@ export class BudgetSimulationRunService {
       ]);
 
       let prevMonthFreeCashBalance = 0;
-      let prevJarBalances: Record<string, number> = {};
+      const prevJarBalances: Record<string, number> = {};
       const jarsRefillNeeded = { ...allocations };
 
       if (prevMonth) {

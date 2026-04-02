@@ -39,9 +39,9 @@ const MIN_DWELL: Record<SpotlightState, number> = {
 const TRANSITION_PROB: Record<SpotlightState, number> = {
   dormant: 0, // dormant never self-transitions; spawned externally
   emerging: 0.25,
-  hype: 0.30,
-  peak: 0.50,
-  decline: 0.30,
+  hype: 0.3,
+  peak: 0.5,
+  decline: 0.3,
   recovery: 0.35,
 };
 
@@ -54,7 +54,9 @@ const NEXT_STATE: Record<SpotlightState, SpotlightState> = {
   recovery: 'dormant',
 };
 
-export function transitionSpotlight(input: SpotlightTransitionInput): SpotlightTransitionResult {
+export function transitionSpotlight(
+  input: SpotlightTransitionInput,
+): SpotlightTransitionResult {
   const { currentState, ticksInCurrentState, seed } = input;
 
   if (currentState === 'dormant') {
@@ -76,12 +78,18 @@ export function transitionSpotlight(input: SpotlightTransitionInput): SpotlightT
 /** Price impact multiplier for each spotlight state. */
 export function spotlightPriceMultiplier(state: SpotlightState): number {
   switch (state) {
-    case 'dormant': return 0;
-    case 'emerging': return 0.02;
-    case 'hype': return 0.05;
-    case 'peak': return 0.08;
-    case 'decline': return -0.04;
-    case 'recovery': return -0.01;
+    case 'dormant':
+      return 0;
+    case 'emerging':
+      return 0.02;
+    case 'hype':
+      return 0.05;
+    case 'peak':
+      return 0.08;
+    case 'decline':
+      return -0.04;
+    case 'recovery':
+      return -0.01;
   }
 }
 

@@ -3,7 +3,7 @@ import { LearnService } from './learn.service';
 import { LearnController } from './learn.controller';
 
 @Module({
-    controllers: [LearnController],
-    providers: [LearnService],
+  controllers: [LearnController],
+  providers: [LearnService],
 })
-export class LearnModule { }
+export class LearnModule {}

@@ -14,11 +14,18 @@ export class InvestNewsQuery {
     });
   }
 
-  async findRecent(limit: number = 20): Promise<NewsWithImpactsRow[]> {
+  async findRecent(
+    limit: number = 20,
+    cursor?: bigint,
+  ): Promise<NewsWithImpactsRow[]> {
     return this.prisma.simNewsItem.findMany({
       include: { assetImpacts: true, sectorImpacts: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { id: 'desc' },
       take: limit,
+      ...(cursor != null && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
     });
   }
 

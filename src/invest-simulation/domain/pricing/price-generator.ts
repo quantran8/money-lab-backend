@@ -48,7 +48,8 @@ export function generatePrice(input: GeneratePriceInput): GeneratePriceResult {
   const { assetId, prevPrice, tickIndex, impacts, volatilityProfile } = input;
 
   const seed = `${tickIndex}:${assetId}`;
-  const noiseAmp = NOISE_AMPLITUDE[volatilityProfile] ?? NOISE_AMPLITUDE['medium'];
+  const noiseAmp =
+    NOISE_AMPLITUDE[volatilityProfile] ?? NOISE_AMPLITUDE['medium'];
 
   // Seeded noise in [-noiseAmp, +noiseAmp]
   const noiseRaw = deterministicRandom(seed);

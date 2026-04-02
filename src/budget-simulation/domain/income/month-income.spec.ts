@@ -7,10 +7,9 @@ import {
 describe('resolveBaseJobIncome', () => {
   it('multiplies base by level multiplier', () => {
     expect(
-      resolveBaseJobIncome(
-        { baseMonthlyIncome: 3000 },
-        { incomeMultiplier: 1.1 } as { incomeMultiplier: unknown },
-      ),
+      resolveBaseJobIncome({ baseMonthlyIncome: 3000 }, {
+        incomeMultiplier: 1.1,
+      } as { incomeMultiplier: unknown }),
     ).toBe(3300);
   });
 

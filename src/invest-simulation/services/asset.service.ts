@@ -28,16 +28,16 @@ export class AssetService {
   async getAssetList(
     filter: AssetFilter = {},
     limit: number = 50,
-    offset: number = 0,
+    cursor?: bigint,
   ) {
     return wrapAsync(this.logger, 'getAssetList', async () => {
       const [assets, total, tick] = await Promise.all([
-        this.assetQuery.findAllWithSector(filter, limit, offset),
+        this.assetQuery.findAllWithSector(filter, limit, cursor),
         this.assetQuery.countAll(filter),
         this.marketQuery.findCurrentTick(),
       ]);
 
-      let priceMap: Record<string, { price: number; changePct: number }> = {};
+      const priceMap: Record<string, { price: number; changePct: number }> = {};
       if (tick) {
         const prices = await this.marketQuery.findLatestPrices(tick.id);
         for (const p of prices) {
@@ -47,6 +47,9 @@ export class AssetService {
           };
         }
       }
+
+      const nextCursor =
+        assets.length === limit ? assets[assets.length - 1].id : null;
 
       return {
         data: assets.map((a) => ({
@@ -61,9 +64,13 @@ export class AssetService {
         })),
         total,
         limit,
-        offset,
+        nextCursor: nextCursor?.toString() ?? null,
       };
     });
+  }
+
+  async getCategories(sectorId?: number): Promise<string[]> {
+    return this.assetQuery.findDistinctCategories(sectorId);
   }
 
   async getAssetDetail(assetId: bigint) {

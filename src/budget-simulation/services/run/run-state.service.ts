@@ -65,9 +65,26 @@ function buildJarsMap(
   return map;
 }
 
-function mapPendingEventToPayload(
-  e: { id: bigint; eventSource: string | null; eventSubtype: string | null; template: { id: bigint; title: string; description: string | null; options: Array<{ id: bigint; optionLabel: string; description: string | null; moneyJarCode: string | null; moneyDelta: number; healthDelta: number; lqiDelta: number; learningXpDelta: number }> } },
-): SpawnEventTemplatePayload {
+function mapPendingEventToPayload(e: {
+  id: bigint;
+  eventSource: string | null;
+  eventSubtype: string | null;
+  template: {
+    id: bigint;
+    title: string;
+    description: string | null;
+    options: Array<{
+      id: bigint;
+      optionLabel: string;
+      description: string | null;
+      moneyJarCode: string | null;
+      moneyDelta: number;
+      healthDelta: number;
+      lqiDelta: number;
+      learningXpDelta: number;
+    }>;
+  };
+}): SpawnEventTemplatePayload {
   return {
     eventId: e.id.toString(),
     eventSource: e.eventSource ?? 'life',
@@ -201,7 +218,7 @@ export class BudgetSimulationRunStateService {
     if (monthResolved && latestMonth) {
       const fullMonth: MonthWithRunAndJobLevelAndJars = {
         ...latestMonth,
-        run: { ...run, jobState: run.jobState! },
+        run: { ...run, jobState: run.jobState },
       } as MonthWithRunAndJobLevelAndJars;
       const preview = await this.previewService.computePreview(fullMonth);
       return [preview, undefined];

@@ -1,7 +1,9 @@
 import { Prisma } from '@prisma/client';
 
 /** Position row. */
-export type PositionRow = Prisma.PortfolioPositionGetPayload<Record<string, never>>;
+export type PositionRow = Prisma.PortfolioPositionGetPayload<
+  Record<string, never>
+>;
 
 /** Position with asset and sector info. */
 export type PositionWithAssetRow = Prisma.PortfolioPositionGetPayload<{
@@ -9,7 +11,9 @@ export type PositionWithAssetRow = Prisma.PortfolioPositionGetPayload<{
 }>;
 
 /** Transaction row. */
-export type TransactionRow = Prisma.PortfolioTransactionGetPayload<Record<string, never>>;
+export type TransactionRow = Prisma.PortfolioTransactionGetPayload<
+  Record<string, never>
+>;
 
 /** Transaction with asset info. */
 export type TransactionWithAssetRow = Prisma.PortfolioTransactionGetPayload<{

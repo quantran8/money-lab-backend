@@ -1,8 +1,4 @@
-export type {
-  AssetRow,
-  AssetWithSectorRow,
-  SectorRow,
-} from './asset.types.js';
+export type { AssetRow, AssetWithSectorRow, SectorRow } from './asset.types.js';
 
 export type {
   MarketTickRow,
@@ -39,12 +35,18 @@ export type {
   ArcTypeRow,
   ArcInstanceRow,
   ArcInstanceWithTypeRow,
+  ArcSectorImpactRow,
+  ArcSpotlightTemplateRow,
+  ArcAssetAffinityRow,
 } from './arc.types.js';
 
 export type {
   PolicyTemplateRow,
   PolicyInstanceRow,
   PolicyInstanceWithTemplateRow,
+  PolicySectorImpactRow,
+  PolicyTemplateWithImpactsRow,
+  PolicyInstanceWithTemplateAndImpactsRow,
 } from './policy.types.js';
 
 export type {

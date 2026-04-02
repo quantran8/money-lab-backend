@@ -37,20 +37,24 @@ export function transformRecordToNumbers({ value }: TransformFnParams) {
  * Validates that value is a plain object and every value is a number.
  */
 export function IsRecordOfNumbers(validationOptions?: ValidationOptions) {
-    return ValidateBy(
-        {
-            name: 'isRecordOfNumbers',
-            validator: {
-                validate(value: unknown) {
-                    if (typeof value !== 'object' || value === null || Array.isArray(value))
-                        return false;
-                    return Object.values(value).every(
-                        (v) => typeof v === 'number' && !Number.isNaN(v),
-                    );
-                },
-                defaultMessage: () => 'Each value must be a number',
-            },
+  return ValidateBy(
+    {
+      name: 'isRecordOfNumbers',
+      validator: {
+        validate(value: unknown) {
+          if (
+            typeof value !== 'object' ||
+            value === null ||
+            Array.isArray(value)
+          )
+            return false;
+          return Object.values(value).every(
+            (v) => typeof v === 'number' && !Number.isNaN(v),
+          );
         },
-        validationOptions,
-    );
+        defaultMessage: () => 'Each value must be a number',
+      },
+    },
+    validationOptions,
+  );
 }

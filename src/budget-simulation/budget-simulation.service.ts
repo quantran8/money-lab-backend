@@ -30,12 +30,7 @@ export class BudgetSimulationService {
     jobId: number,
     commitmentAmounts: Record<number, number>,
   ) {
-    return this.runService.startRun(
-      userId,
-      moduleId,
-      jobId,
-      commitmentAmounts,
-    );
+    return this.runService.startRun(userId, moduleId, jobId, commitmentAmounts);
   }
 
   async startMonth(

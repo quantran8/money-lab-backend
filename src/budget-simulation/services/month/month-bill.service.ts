@@ -1,8 +1,15 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import { END_OF_MONTH_WEEK } from '#budget-simulation/budget-simulation.constant.js';
-import { computeBills as domainComputeBills, billsReconcile } from '#budget-simulation/domain/index.js';
+import {
+  computeBills as domainComputeBills,
+  billsReconcile,
+} from '#budget-simulation/domain/index.js';
 import { MonthSpendService } from './month-spend.service';
 import type {
   BillsComputeResult,
@@ -44,8 +51,7 @@ export class MonthBillService {
   ): Promise<Record<string, number | string | null>> {
     const monthIdBig = BigInt(monthId);
     const { jars, month } = context;
-    if (month.run.userId !== userId)
-      throw new ForbiddenException('Forbidden');
+    if (month.run.userId !== userId) throw new ForbiddenException('Forbidden');
     const weekToCheck = effectiveCurrentWeek ?? month.currentWeek;
     if (weekToCheck < END_OF_MONTH_WEEK)
       throw new BadRequestException('Cannot finalize bills before week 4');

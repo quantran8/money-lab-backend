@@ -19,7 +19,12 @@ export class InvestScoreRepository {
   ) {
     return this.client(tx).userScore.upsert({
       where: { userId },
-      update: { wealthPoints, stabilityFactor, wealthTier, lastCalculatedAt: new Date() },
+      update: {
+        wealthPoints,
+        stabilityFactor,
+        wealthTier,
+        lastCalculatedAt: new Date(),
+      },
       create: { userId, wealthPoints, stabilityFactor, wealthTier },
     });
   }

@@ -40,8 +40,12 @@ Financial education simulation where users trade fictional assets in a system-co
 - **InvestAssetSpotlightTemplate** — spotlight event templates (code, title, rarity)
 - **InvestAssetSpotlightInstance** — active spotlight FSM (6 states: dormant→emerging→hype→peak→decline→recovery)
 - **InvestWorldArcType** — world arc type definitions (SmallInt PK)
+- **InvestWorldArcSectorImpact** — per-sector/category weight for each arc type (weight: -1.0 to +1.0, category-specific overrides sector-wide)
 - **InvestWorldArcInstance** — active arc FSM (5 states: background→spark→expansion→integration→absorbed)
+- **ArcSpotlightTemplate** — arc type → spotlight template mapping with weight (which templates can spawn under each arc)
+- **ArcAssetAffinity** — arc type → asset affinity (0.0–1.0, which assets get spotlight priority under each arc)
 - **InvestPolicyThreadTemplate** — policy thread definitions
+- **PolicySectorImpact** — per-sector/category weight for each policy template (weight: -1.0 to +1.0, category-specific overrides sector-wide)
 
 ### Phase 3 — Policy Threads
 - **InvestPolicyThreadInstance** — active policy FSM (6 states: undeclared→declared_path→action_1→action_2→action_3→resolution)
@@ -65,14 +69,14 @@ Financial education simulation where users trade fictional assets in a system-co
 ## Price Model
 - Prices stored as integers (cents)
 - Guardrails: max -20% / +30% per tick, floor = 1
-- Formula: `newPrice = prevPrice × (1 + combinedImpact)` where combinedImpact = sector + spotlight + arc + policy + noise
+- Formula: `newPrice = prevPrice × (1 + combinedImpact)` where combinedImpact = sector + spotlight + arc (per-asset: magnitude × sector weight) + policy (per-asset: magnitude × sector weight) + noise
 - Noise amplitude by volatility profile: low=0.01, medium=0.02, high=0.04, extreme=0.06
 - Change percentage tracked per price point
 
 ## State Machine Rules
 - **Spotlight**: 6 states, each with min dwell ticks before transition. Dormant is terminal/spawn-only. Cooldown of 10 ticks after completion.
-- **World Arc**: 5 states with progress tracking. Absorbed is terminal. Global market impact per state.
-- **Policy Thread**: 6 states (undeclared→declared_path→action_1-3→resolution). Creates market uncertainty. Resolution is terminal.
+- **World Arc**: 5 states with progress tracking. Absorbed is terminal. Per-sector/category market impact per state via WorldArcSectorImpact weights. Category-specific weight takes precedence over sector-wide weight. Impact = magnitude(state) × weight.
+- **Policy Thread**: 6 states (undeclared→declared_path→action_1-3→resolution). Per-sector/category market impact per state via PolicySectorImpact weights (same pattern as arc). Magnitude: declared_path=0.01, action_1=0.015, action_2=0.02, action_3=0.015. Impact = magnitude(state) × weight. Resolution is terminal.
 - Transitions are deterministic (seeded by `type:instanceId:tickIndex`).
 
 ## Trading Rules
@@ -83,7 +87,8 @@ Financial education simulation where users trade fictional assets in a system-co
 
 ## News Generation Rules
 - News is descriptive, never advisory (no "buy"/"sell" language)
-- Generated from state machine transitions (spotlight state changes, arc state changes)
+- Generated from state machine transitions (spotlight, arc, and policy state changes)
+- Policy news uses `stateDescriptions` from template for body text (per-state narrative)
 - Each news item carries asset impacts and sector impacts (used for price generation)
 - Headline templates selected deterministically by seed
 
@@ -99,11 +104,25 @@ Financial education simulation where users trade fictional assets in a system-co
 ## Tick Orchestration Order
 1. Create new market tick
 2. Advance state machines (spotlights, arcs, policies)
-3. Generate news from transitions → returns sector impacts
-4. Generate prices from combined impacts (sector + spotlight + arc + policy + noise)
-5. Open behavior windows from transitions
-6. Close expired behavior windows + evaluate user behavior
-7. Create world state snapshot
+3. Auto-spawn new instances if needed (arc-driven spotlights, arc respawn, policy respawn)
+4. Generate news from transitions (advance + spawn events) → returns sector impacts
+5. Generate prices from combined impacts (sector + spotlight + arc + policy + noise)
+6. Open behavior windows from transitions
+7. Close expired behavior windows + evaluate user behavior
+8. Create world state snapshot
+
+## Auto-Spawn Rules
+- **Arc-driven spotlight spawn**: When arc transitions to `expansion` or `integration`, spawn up to 2 spotlights on assets with highest affinity (via ArcAssetAffinity), using sentiment-matched templates (via ArcSpotlightTemplate)
+- **Arc respawn**: When active arc count < MAX_ACTIVE_ARCS (3), spawn new arc from available types past cooldown (20 ticks)
+- **Policy respawn**: When active policy count < MAX_ACTIVE_POLICIES (2), spawn new policy from available templates past cooldown (15 ticks), preferring templates aligned with active arc sectors
+- All spawn decisions are deterministic (seeded PRNG)
+- Spawned instances produce events that feed into news generation and price impacts in the same tick
+
+## Tick Scheduling
+- Cron job runs every 6 hours (0:00, 6:00, 12:00, 18:00 UTC) via `InvestTickScheduler`
+- Uses `@nestjs/schedule` `ScheduleModule`
+- Overlap guard: skips invocation if previous tick is still running
+- Manual trigger still available via `POST internal/run-tick`
 
 ## Sim Calendar
 1 tick = 1 day, 30 days/month, 12 months/year

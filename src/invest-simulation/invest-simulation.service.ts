@@ -44,11 +44,15 @@ export class InvestSimulationService {
   // ── Assets ───────────────────────────────────────────────────────
 
   async getAssets(
-    filter: { sectorId?: number; search?: string } = {},
+    filter: { sectorId?: number; search?: string; category?: string } = {},
     limit?: number,
-    offset?: number,
+    cursor?: bigint,
   ) {
-    return this.asset.getAssetList(filter, limit, offset);
+    return this.asset.getAssetList(filter, limit, cursor);
+  }
+
+  async getAssetCategories(sectorId?: number) {
+    return this.asset.getCategories(sectorId);
   }
 
   async getAssetDetail(assetId: bigint) {
@@ -65,8 +69,8 @@ export class InvestSimulationService {
     return this.portfolio.getPositions(userId);
   }
 
-  async getTransactions(userId: string, limit?: number, offset?: number) {
-    return this.portfolio.getTransactions(userId, limit, offset);
+  async getTransactions(userId: string, limit?: number, cursor?: bigint) {
+    return this.portfolio.getTransactions(userId, limit, cursor);
   }
 
   // ── Trading ──────────────────────────────────────────────────────
@@ -81,8 +85,8 @@ export class InvestSimulationService {
 
   // ── News ─────────────────────────────────────────────────────────
 
-  async getNewsFeed(limit?: number) {
-    return this.news.getNewsFeed(limit);
+  async getNewsFeed(limit?: number, cursor?: bigint) {
+    return this.news.getNewsFeed(limit, cursor);
   }
 
   async getNewsById(newsId: bigint) {
@@ -107,7 +111,9 @@ export class InvestSimulationService {
 
   async evaluateAllUsers() {
     // Use latest tick index
-    const state = await this.marketState.getCurrentMarketState().catch(() => null);
+    const state = await this.marketState
+      .getCurrentMarketState()
+      .catch(() => null);
     const tickIndex = BigInt(state?.tickIndex ?? 0);
     return this.stabilityScore.evaluateAllUsers(tickIndex);
   }

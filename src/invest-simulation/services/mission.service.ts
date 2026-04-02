@@ -45,22 +45,29 @@ export class MissionService {
    * Assign triggered missions for a user based on their current state.
    */
   async assignForUser(userId: string): Promise<number> {
-    const [allMissions, assignedCodes, snapshots, score, positions] = await Promise.all([
-      this.missionQuery.findAllMissions(),
-      this.missionQuery.findUserMissionCodes(userId),
-      this.behaviorQuery.findSnapshotsByUser(userId, 10),
-      this.scoreQuery.findUserScore(userId),
-      this.portfolioQuery.findPositionsWithAsset(userId),
-    ]);
+    const [allMissions, assignedCodes, snapshots, score, positions] =
+      await Promise.all([
+        this.missionQuery.findAllMissions(),
+        this.missionQuery.findUserMissionCodes(userId),
+        this.behaviorQuery.findSnapshotsByUser(userId, 10),
+        this.scoreQuery.findUserScore(userId),
+        this.portfolioQuery.findPositionsWithAsset(userId),
+      ]);
 
     const sectorSet = new Set(positions.map((p) => p.asset.sector.code));
 
-    const avgTurnover = snapshots.length > 0
-      ? snapshots.reduce((s, snap) => s + Number(snap.turnoverScore), 0) / snapshots.length
-      : 0;
-    const avgVolatilityChasing = snapshots.length > 0
-      ? snapshots.reduce((s, snap) => s + Number(snap.volatilityChasingScore), 0) / snapshots.length
-      : 0;
+    const avgTurnover =
+      snapshots.length > 0
+        ? snapshots.reduce((s, snap) => s + Number(snap.turnoverScore), 0) /
+          snapshots.length
+        : 0;
+    const avgVolatilityChasing =
+      snapshots.length > 0
+        ? snapshots.reduce(
+            (s, snap) => s + Number(snap.volatilityChasingScore),
+            0,
+          ) / snapshots.length
+        : 0;
 
     const userState: UserState = {
       snapshotCount: snapshots.length,

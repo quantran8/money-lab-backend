@@ -19,7 +19,10 @@ export class InvestBehaviorEvaluationService {
    * Evaluate all users' behavior for a list of closed window IDs.
    * Bulk-fetches transactions and positions, then computes metrics per user.
    */
-  async evaluateClosedWindows(closedWindowIds: bigint[], tx: TxClient): Promise<number> {
+  async evaluateClosedWindows(
+    closedWindowIds: bigint[],
+    tx: TxClient,
+  ): Promise<number> {
     if (closedWindowIds.length === 0) return 0;
 
     // Fetch window details
@@ -65,7 +68,10 @@ export class InvestBehaviorEvaluationService {
           include: { asset: { include: { sector: true } } },
         });
 
-        const positionsMap: Record<string, { quantity: number; sectorCode: string; assetType: string }> = {};
+        const positionsMap: Record<
+          string,
+          { quantity: number; sectorCode: string; assetType: string }
+        > = {};
         for (const p of positions) {
           positionsMap[p.assetId.toString()] = {
             quantity: p.quantity,
@@ -90,7 +96,9 @@ export class InvestBehaviorEvaluationService {
           positionsStart: positionsMap,
           positionsEnd: positionsMap,
           newsTickIds,
-          windowDurationTicks: Number(window.endTickIndex - window.startTickIndex),
+          windowDurationTicks: Number(
+            window.endTickIndex - window.startTickIndex,
+          ),
         };
 
         const metrics = computeBehaviorMetrics(input);

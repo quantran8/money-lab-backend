@@ -24,7 +24,9 @@ export class InvestPortfolioQuery {
     });
   }
 
-  async findPositionsWithAsset(userId: string): Promise<PositionWithAssetRow[]> {
+  async findPositionsWithAsset(
+    userId: string,
+  ): Promise<PositionWithAssetRow[]> {
     return this.prisma.portfolioPosition.findMany({
       where: { userId, quantity: { gt: 0 } },
       include: { asset: { include: { sector: true } } },
@@ -32,7 +34,10 @@ export class InvestPortfolioQuery {
     });
   }
 
-  async findPosition(userId: string, assetId: bigint): Promise<PositionRow | null> {
+  async findPosition(
+    userId: string,
+    assetId: bigint,
+  ): Promise<PositionRow | null> {
     return this.prisma.portfolioPosition.findUnique({
       where: { userId_assetId: { userId, assetId } },
     });
@@ -41,14 +46,17 @@ export class InvestPortfolioQuery {
   async findTransactions(
     userId: string,
     limit: number = 50,
-    offset: number = 0,
+    cursor?: bigint,
   ): Promise<TransactionWithAssetRow[]> {
     return this.prisma.portfolioTransaction.findMany({
       where: { userId },
       include: { asset: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { id: 'desc' },
       take: limit,
-      skip: offset,
+      ...(cursor != null && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
     });
   }
 }

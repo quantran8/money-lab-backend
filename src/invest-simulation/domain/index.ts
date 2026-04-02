@@ -63,7 +63,7 @@ export type {
 
 export {
   transitionArc,
-  arcImpactMultiplier,
+  computeArcAssetImpacts,
   isArcActive,
   isArcCompleted,
 } from './state-machines/world-arc.js';
@@ -72,16 +72,16 @@ export type {
   ArcState,
   ArcTransitionInput,
   ArcTransitionResult,
+  ArcSectorWeight,
 } from './state-machines/world-arc.js';
 
 // Phase 2: News generation
-export {
-  generateNewsFromTransitions,
-} from './news/news-generator.js';
+export { generateNewsFromTransitions } from './news/news-generator.js';
 
 export type {
   SpotlightTransitionEvent,
   ArcTransitionEvent,
+  PolicyNewsEvent,
   StateTransitionEvent,
   GeneratedNewsItem,
 } from './news/news-generator.js';
@@ -90,6 +90,7 @@ export type {
 export {
   transitionPolicy,
   policyPriceMultiplier,
+  computePolicyAssetImpacts,
   isPolicyActive,
   isPolicyCompleted,
 } from './state-machines/policy-thread.js';
@@ -98,6 +99,7 @@ export type {
   PolicyState,
   PolicyTransitionInput,
   PolicyTransitionResult,
+  PolicySectorWeight,
 } from './state-machines/policy-thread.js';
 
 // Phase 3: Behavior metrics
@@ -125,10 +127,7 @@ export type {
 // Phase 3: Score
 export { computeScore } from './behavior/score-calculator.js';
 
-export type {
-  ScoreInput,
-  ScoreResult,
-} from './behavior/score-calculator.js';
+export type { ScoreInput, ScoreResult } from './behavior/score-calculator.js';
 
 // Phase 4: Reflections
 export { generateReflections } from './reflection/reflection-generator.js';
@@ -150,10 +149,24 @@ export type {
   MatchedMission,
 } from './mission/mission-matcher.js';
 
+// Phase 5: Spawn engine
+export {
+  shouldSpawnSpotlightFromArc,
+  selectSpotlightAssets,
+  selectSpotlightTemplate,
+  filterArcCandidatesByCooldown,
+  selectArcType,
+  selectPolicyTemplate,
+} from './state-machines/spawn-engine.js';
+
+export type {
+  ArcSpawnCandidate,
+  SpotlightAssetCandidate,
+  SpotlightTemplateCandidate,
+  PolicySpawnCandidate,
+} from './state-machines/spawn-engine.js';
+
 // Phase 4: Reports
 export { buildReport } from './report/report-builder.js';
 
-export type {
-  ReportInput,
-  ReportData,
-} from './report/report-builder.js';
+export type { ReportInput, ReportData } from './report/report-builder.js';

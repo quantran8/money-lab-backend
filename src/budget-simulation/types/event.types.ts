@@ -9,11 +9,13 @@ export type LifeEventTemplateRow = Prisma.LifeEventTemplateGetPayload<
 export type LifeEventTemplateWithOptionsRow =
   Prisma.LifeEventTemplateGetPayload<{ include: { options: true } }>;
 
-export type EventPoolWeightRow =
-  Prisma.EventPoolWeightGetPayload<Record<string, never>>;
+export type EventPoolWeightRow = Prisma.EventPoolWeightGetPayload<
+  Record<string, never>
+>;
 
-export type LifeEventOptionRow =
-  Prisma.LifeEventOptionGetPayload<Record<string, never>>;
+export type LifeEventOptionRow = Prisma.LifeEventOptionGetPayload<
+  Record<string, never>
+>;
 
 /** Option shown on spawn / existing pending event. */
 export interface SpawnEventOptionPayload {

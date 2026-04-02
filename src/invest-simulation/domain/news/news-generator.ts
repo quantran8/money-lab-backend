@@ -4,9 +4,13 @@
 // No I/O, no NestJS, no DB
 // ──────────────────────────────────────────────────────────────────
 
-import { deterministicRandom, seedInt } from '../../invest-simulation.helpers.js';
+import {
+  deterministicRandom,
+  seedInt,
+} from '../../invest-simulation.helpers.js';
 import type { SpotlightState } from '../state-machines/asset-spotlight.js';
 import type { ArcState } from '../state-machines/world-arc.js';
+import type { PolicyState } from '../state-machines/policy-thread.js';
 
 export interface SpotlightTransitionEvent {
   type: 'spotlight';
@@ -24,7 +28,19 @@ export interface ArcTransitionEvent {
   toState: ArcState;
 }
 
-export type StateTransitionEvent = SpotlightTransitionEvent | ArcTransitionEvent;
+export interface PolicyNewsEvent {
+  type: 'policy';
+  templateTitle: string;
+  fromState: PolicyState;
+  toState: PolicyState;
+  /** Human-readable description of the target state. */
+  stateDescription: string | null;
+}
+
+export type StateTransitionEvent =
+  | SpotlightTransitionEvent
+  | ArcTransitionEvent
+  | PolicyNewsEvent;
 
 export interface GeneratedNewsItem {
   title: string;
@@ -41,47 +57,70 @@ export interface GeneratedNewsItem {
 // ── Headline templates ─────────────────────────────────────────
 
 const SPOTLIGHT_HEADLINES: Record<string, string[]> = {
-  'emerging': [
+  emerging: [
     'Whispers surround {asset} as sector attention grows',
     'Analysts notice unusual patterns in {asset}',
     'Market observers keep an eye on {asset}',
   ],
-  'hype': [
+  hype: [
     '{asset} attracts heightened market attention',
     'Discussion intensifies around {asset} prospects',
     'Traders debate {asset} valuation amid rising interest',
   ],
-  'peak': [
+  peak: [
     '{asset} reaches center stage in market discourse',
     'Peak attention: {asset} dominates financial discussion',
     'Market focus narrows on {asset} as interest peaks',
   ],
-  'decline': [
+  decline: [
     'Interest in {asset} begins to cool',
     '{asset} fades from the spotlight as attention wanes',
     'Market attention shifts away from {asset}',
   ],
-  'recovery': [
+  recovery: [
     '{asset} enters stabilization phase after turbulent period',
     'Calm returns to {asset} as volatility subsides',
     '{asset} shows signs of normalization',
   ],
 };
 
+const POLICY_HEADLINES: Record<string, string[]> = {
+  declared_path: [
+    'Policy watch: {policy} enters public discourse',
+    'Government signals intent on {policy}',
+  ],
+  action_1: [
+    '{policy} advances as formal proposal introduced',
+    'Lawmakers take first step on {policy}',
+  ],
+  action_2: [
+    '{policy} gains legislative momentum',
+    'Key milestone reached for {policy}',
+  ],
+  action_3: [
+    '{policy} nears final approval',
+    'Final stage: {policy} awaits last decision',
+  ],
+  resolution: [
+    '{policy} officially enacted into law',
+    '{policy} concluded — markets assess long-term impact',
+  ],
+};
+
 const ARC_HEADLINES: Record<string, string[]> = {
-  'spark': [
+  spark: [
     'Early signals of {arc} emerge in global markets',
     'A new narrative takes shape: {arc}',
   ],
-  'expansion': [
+  expansion: [
     '{arc} gains momentum across multiple sectors',
     'Broad impact felt as {arc} continues to unfold',
   ],
-  'integration': [
+  integration: [
     'Markets begin to absorb implications of {arc}',
     '{arc} enters integration phase, reshaping expectations',
   ],
-  'absorbed': [
+  absorbed: [
     '{arc} fully absorbed into market baseline',
     'The era of {arc} concludes as markets find new equilibrium',
   ],
@@ -97,6 +136,11 @@ const TONE_MAP: Record<string, string> = {
   expansion: 'optimistic',
   integration: 'measured',
   absorbed: 'neutral',
+  declared_path: 'watchful',
+  action_1: 'concerned',
+  action_2: 'tense',
+  action_3: 'anticipatory',
+  resolution: 'definitive',
 };
 
 const INTENSITY_MAP: Record<string, number> = {
@@ -109,6 +153,11 @@ const INTENSITY_MAP: Record<string, number> = {
   expansion: 0.5,
   integration: 0.4,
   absorbed: 0.1,
+  declared_path: 0.3,
+  action_1: 0.5,
+  action_2: 0.7,
+  action_3: 0.6,
+  resolution: 0.4,
 };
 
 function pickTemplate(templates: string[], seed: string): string {
@@ -130,7 +179,10 @@ export function generateNewsFromTransitions(
       const templates = SPOTLIGHT_HEADLINES[event.toState];
       if (!templates) continue;
 
-      const title = pickTemplate(templates, seed).replace('{asset}', event.assetName);
+      const title = pickTemplate(templates, seed).replace(
+        '{asset}',
+        event.assetName,
+      );
       const impact = spotlightNewsImpact(event.toState);
 
       items.push({
@@ -148,7 +200,10 @@ export function generateNewsFromTransitions(
       const templates = ARC_HEADLINES[event.toState];
       if (!templates) continue;
 
-      const title = pickTemplate(templates, seed).replace('{arc}', event.arcTypeName);
+      const title = pickTemplate(templates, seed).replace(
+        '{arc}',
+        event.arcTypeName,
+      );
       const impact = arcNewsImpact(event.toState);
 
       items.push({
@@ -161,6 +216,29 @@ export function generateNewsFromTransitions(
         sectorImpacts: {},
       });
     }
+
+    if (event.type === 'policy') {
+      const templates = POLICY_HEADLINES[event.toState];
+      if (!templates) continue;
+
+      const title = pickTemplate(templates, seed).replace(
+        '{policy}',
+        event.templateTitle,
+      );
+      const body =
+        event.stateDescription ??
+        `${event.templateTitle} moves to ${event.toState} phase.`;
+
+      items.push({
+        title,
+        body,
+        tone: TONE_MAP[event.toState] ?? 'neutral',
+        intensity: INTENSITY_MAP[event.toState] ?? 0.3,
+        narrativeTag: `policy:${event.toState}`,
+        assetImpacts: {},
+        sectorImpacts: {},
+      });
+    }
   }
 
   return items;
@@ -168,21 +246,32 @@ export function generateNewsFromTransitions(
 
 function spotlightNewsImpact(state: SpotlightState): number {
   switch (state) {
-    case 'emerging': return 0.02;
-    case 'hype': return 0.04;
-    case 'peak': return 0.06;
-    case 'decline': return -0.03;
-    case 'recovery': return -0.01;
-    default: return 0;
+    case 'emerging':
+      return 0.02;
+    case 'hype':
+      return 0.04;
+    case 'peak':
+      return 0.06;
+    case 'decline':
+      return -0.03;
+    case 'recovery':
+      return -0.01;
+    default:
+      return 0;
   }
 }
 
 function arcNewsImpact(state: ArcState): number {
   switch (state) {
-    case 'spark': return 0.01;
-    case 'expansion': return 0.02;
-    case 'integration': return 0.01;
-    case 'absorbed': return 0;
-    default: return 0;
+    case 'spark':
+      return 0.01;
+    case 'expansion':
+      return 0.02;
+    case 'integration':
+      return 0.01;
+    case 'absorbed':
+      return 0;
+    default:
+      return 0;
   }
 }

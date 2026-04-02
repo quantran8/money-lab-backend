@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#app/prisma/prisma.service.js';
-import type { BehaviorWindowRow, BehaviorSnapshotRow, StabilityMetricRow } from '../types/index.js';
+import type {
+  BehaviorWindowRow,
+  BehaviorSnapshotRow,
+  StabilityMetricRow,
+} from '../types/index.js';
 
 @Injectable()
 export class InvestBehaviorQuery {
@@ -13,7 +17,10 @@ export class InvestBehaviorQuery {
     });
   }
 
-  async findSnapshotsByUser(userId: string, limit: number = 10): Promise<BehaviorSnapshotRow[]> {
+  async findSnapshotsByUser(
+    userId: string,
+    limit: number = 10,
+  ): Promise<BehaviorSnapshotRow[]> {
     return this.prisma.userBehaviorSnapshot.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -21,7 +28,9 @@ export class InvestBehaviorQuery {
     });
   }
 
-  async findLatestStabilityMetric(userId: string): Promise<StabilityMetricRow | null> {
+  async findLatestStabilityMetric(
+    userId: string,
+  ): Promise<StabilityMetricRow | null> {
     return this.prisma.userStabilityMetric.findFirst({
       where: { userId },
       orderBy: { tickIndex: 'desc' },

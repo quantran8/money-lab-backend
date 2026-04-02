@@ -131,7 +131,13 @@ export function jarAvailable(
  */
 export function buildJarAvailableMap(
   freeCash: number,
-  jars: { jarCode: string; allocated: number; spent: number; overflowIn: number; overflowOut: number }[],
+  jars: {
+    jarCode: string;
+    allocated: number;
+    spent: number;
+    overflowIn: number;
+    overflowOut: number;
+  }[],
 ): Map<string, number> {
   const map = new Map<string, number>();
   map.set('free_cash', Math.max(0, freeCash));
@@ -144,7 +150,11 @@ export function buildJarAvailableMap(
   return map;
 }
 
-const CORE_JAR_CODES = [JarCode.fun, JarCode.learning, JarCode.give] as string[];
+const CORE_JAR_CODES = [
+  JarCode.fun,
+  JarCode.learning,
+  JarCode.give,
+] as string[];
 const WEEKS_PER_MONTH = NUMBER_OF_WEEKS_PER_MONTH;
 
 /**
@@ -153,8 +163,16 @@ const WEEKS_PER_MONTH = NUMBER_OF_WEEKS_PER_MONTH;
  */
 export function computeWeeklySpend(input: WeeklySpendInput): WeeklySpendResult {
   const {
-    jars, spendModeRate, spendModeCode, monthIndex, nextWeek,
-    runId, monthId, playerHI, currentJobLevel, config,
+    jars,
+    spendModeRate,
+    spendModeCode,
+    monthIndex,
+    nextWeek,
+    runId,
+    monthId,
+    playerHI,
+    currentJobLevel,
+    config,
   } = input;
   const coreJars = jars.filter((j) => CORE_JAR_CODES.includes(j.jarCode));
 
@@ -258,7 +276,8 @@ export interface JobProgressResult {
  * Pure: no I/O.
  */
 export function computeJobProgress(input: JobProgressInput): JobProgressResult {
-  const { currentXp, xpDelta, xpByCap, xpByOverflowCap, currentLevel, levels } = input;
+  const { currentXp, xpDelta, xpByCap, xpByOverflowCap, currentLevel, levels } =
+    input;
   const xpAfter = Math.max(0, currentXp + xpDelta);
 
   const sorted = [...levels].sort((a, b) => a.level - b.level);

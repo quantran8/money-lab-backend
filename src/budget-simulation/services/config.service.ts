@@ -3,7 +3,10 @@ import type { BudgetSimulationModuleConfig } from '../budget-simulation.constant
 import { BUDGET_SIMULATION_MODULE_ID } from '../budget-simulation.constant';
 import { CommitmentLayer } from '../budget-simulation.enum';
 import { ModuleQuery } from '../queries/module.query';
-import { CommitmentQuery, HousingModifierRow } from '../queries/commitment.query';
+import {
+  CommitmentQuery,
+  HousingModifierRow,
+} from '../queries/commitment.query';
 
 /** Cached bill template shape (subset of CommitmentTemplate). */
 export interface CachedBillTemplate {

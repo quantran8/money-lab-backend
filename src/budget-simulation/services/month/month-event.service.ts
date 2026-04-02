@@ -3,12 +3,18 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { clampHi, clampLqi } from '#app/budget-simulation/budget-simulation.helpers.js';
+import {
+  clampHi,
+  clampLqi,
+} from '#app/budget-simulation/budget-simulation.helpers.js';
 import { BudgetMonthQuery } from '#budget-simulation/queries/month.query.js';
 import { BudgetMonthRepository } from '#budget-simulation/repositories/month.repository.js';
 import { RunRepository } from '#budget-simulation/repositories/run.repository.js';
 import { BudgetSimulationConfigService } from '../config.service';
-import { JarCode, LqiState } from '#budget-simulation/budget-simulation.enum.js';
+import {
+  JarCode,
+  LqiState,
+} from '#budget-simulation/budget-simulation.enum.js';
 import {
   BUDGET_SIMULATION_MODULE_ID,
   END_OF_MONTH_WEEK,
@@ -78,8 +84,7 @@ export class MonthEventService {
   ): SpawnEventTemplatePayload {
     const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
-      null;
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ?? null;
     const isOt =
       row.eventSource === EVENT_SOURCE_WORK &&
       row.eventSubtype === EVENT_SUBTYPE_OVERTIME;
@@ -164,7 +169,10 @@ export class MonthEventService {
       month.indexResolution?.lqiStateEnd ??
       month.indexResolution?.lqiStateStart ??
       LqiState.stable;
-    const fromMonth = Math.max(1, month.monthIndex - EVENT_DEDUP_LOOKBACK_MONTHS);
+    const fromMonth = Math.max(
+      1,
+      month.monthIndex - EVENT_DEDUP_LOOKBACK_MONTHS,
+    );
 
     const [usedIds, weightsRows] = await Promise.all([
       moduleId === BUDGET_SIMULATION_MODULE_ID
@@ -217,10 +225,16 @@ export class MonthEventService {
       Number(month.cumulativeFutureYou ?? 0) +
       Number(month.freeCash ?? 0);
 
-    const affordable = filterAffordableTemplates(templates, totalAvailableFunds);
+    const affordable = filterAffordableTemplates(
+      templates,
+      totalAvailableFunds,
+    );
     if (affordable.length === 0) return null;
 
-    const templateRefs = affordable.map((t) => ({ id: t.id, rarity: t.rarity }));
+    const templateRefs = affordable.map((t) => ({
+      id: t.id,
+      rarity: t.rarity,
+    }));
     return chooseTemplate(`${seedBase}:template`, templateRefs);
   }
 
@@ -233,6 +247,9 @@ export class MonthEventService {
     week: number,
   ): Promise<bigint | null> {
     if (month.run.moduleId !== BUDGET_SIMULATION_MODULE_ID) {
+      return null;
+    }
+    if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {
       return null;
     }
     const config = this.configService.getConfig();
@@ -296,8 +313,7 @@ export class MonthEventService {
     );
     const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
-      null;
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ?? null;
     let healthDeltaTotal = 0;
     let lqiDeltaTotal = 0;
     for (const e of rows) {
@@ -446,8 +462,7 @@ export class MonthEventService {
 
     const job = month.run.jobState?.job;
     const level =
-      job?.levels.find((l) => l.level === month.run.jobState?.level) ??
-      null;
+      job?.levels.find((l) => l.level === month.run.jobState?.level) ?? null;
     const sortedOpts = [...event.template.options].sort(
       (a, b) => a.sortOrder - b.sortOrder,
     );
@@ -690,7 +705,7 @@ export class MonthEventService {
         { month, eventTotals: aggregatedTotals },
       );
 
-      let bills: { actual: number, reason: string | null } | null = null;
+      let bills: { actual: number; reason: string | null } | null = null;
       let monthComplete = false;
       let futureYouTotal = 0;
       const spendingSummary: Record<string, number> = {};
@@ -762,7 +777,9 @@ export class MonthEventService {
 
     let nextMonthPreview: NextMonthPreview | undefined;
     let runComplete = false;
-    let runAnalysis: Awaited<ReturnType<RunAnalyzeService['analyzeRun']>> | undefined;
+    let runAnalysis:
+      | Awaited<ReturnType<RunAnalyzeService['analyzeRun']>>
+      | undefined;
 
     if (txResult.monthComplete) {
       if (month.monthIndex >= RUN_MONTH_INDEX_COMPLETE) {

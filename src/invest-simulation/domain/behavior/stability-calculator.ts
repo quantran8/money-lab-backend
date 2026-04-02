@@ -33,7 +33,10 @@ export interface StabilityResult {
  * Diversification bonus: more sectors covered → higher score.
  * Range: 0 to 0.3
  */
-function computeDiversificationScore(sectorCount: number, totalSectors: number): number {
+function computeDiversificationScore(
+  sectorCount: number,
+  totalSectors: number,
+): number {
   if (totalSectors <= 0) return 0;
   const coverage = sectorCount / totalSectors;
   return Math.min(0.3, coverage * 0.3);
@@ -43,7 +46,10 @@ function computeDiversificationScore(sectorCount: number, totalSectors: number):
  * Volatility score: lower chasing + lower turnover → higher bonus.
  * Range: -0.2 to 0.2
  */
-function computeVolatilityScore(avgTurnover: number, avgVolatilityChasing: number): number {
+function computeVolatilityScore(
+  avgTurnover: number,
+  avgVolatilityChasing: number,
+): number {
   // Low turnover bonus (turnover < 1 is calm)
   const turnoverBonus = Math.max(0, 0.1 * (1 - Math.min(avgTurnover, 2) / 2));
   // Low chasing bonus
@@ -76,12 +82,27 @@ function computeHoldingDurationScore(avgDuration: number): number {
  * Clamped to [0.5, 2.0].
  */
 export function computeStabilityFactor(input: StabilityInput): StabilityResult {
-  const diversificationScore = computeDiversificationScore(input.sectorCount, input.totalSectors);
-  const volatilityScore = computeVolatilityScore(input.avgTurnover, input.avgVolatilityChasing);
-  const concentrationPenalty = computeConcentrationPenalty(input.concentrationHHI);
-  const holdingDurationScore = computeHoldingDurationScore(input.avgHoldingDuration);
+  const diversificationScore = computeDiversificationScore(
+    input.sectorCount,
+    input.totalSectors,
+  );
+  const volatilityScore = computeVolatilityScore(
+    input.avgTurnover,
+    input.avgVolatilityChasing,
+  );
+  const concentrationPenalty = computeConcentrationPenalty(
+    input.concentrationHHI,
+  );
+  const holdingDurationScore = computeHoldingDurationScore(
+    input.avgHoldingDuration,
+  );
 
-  const raw = 1 + diversificationScore + volatilityScore + concentrationPenalty + holdingDurationScore;
+  const raw =
+    1 +
+    diversificationScore +
+    volatilityScore +
+    concentrationPenalty +
+    holdingDurationScore;
   const stabilityFactor = Math.max(0.5, Math.min(2.0, raw));
 
   return {

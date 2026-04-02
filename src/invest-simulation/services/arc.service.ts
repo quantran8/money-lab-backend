@@ -4,11 +4,23 @@ import { InvestArcQuery } from '../queries/arc.query.js';
 import { InvestArcRepository } from '../repositories/arc.repository.js';
 import {
   transitionArc,
-  arcImpactMultiplier,
+  computeArcAssetImpacts,
   isArcCompleted,
   type ArcState,
   type ArcTransitionEvent,
+  type ArcSectorWeight,
 } from '../domain/index.js';
+import type { ArcInstanceWithTypeRow } from '../types/index.js';
+
+export interface ArcAdvanceResult {
+  events: ArcTransitionEvent[];
+  /** Per-asset arc impact: assetKey → impact value. */
+  assetImpacts: Record<string, number>;
+  /** Number of arcs still active after this tick's advancement. */
+  remainingActiveCount: number;
+  /** Active instances loaded this tick (with type + sector impacts). */
+  activeInstances: ArcInstanceWithTypeRow[];
+}
 
 @Injectable()
 export class InvestArcService {
@@ -21,15 +33,21 @@ export class InvestArcService {
 
   /**
    * Advance all active arc instances by one tick.
-   * Returns transition events and a global market impact value.
+   * Returns transition events and per-asset arc impacts.
+   *
+   * @param tickIndex  Current tick index.
+   * @param assets     All active assets (needed to map sector weights → per-asset impacts).
+   * @param tx         Transaction client.
    */
-  async advanceAll(tickIndex: bigint, tx: TxClient): Promise<{
-    events: ArcTransitionEvent[];
-    globalImpact: number;
-  }> {
+  async advanceAll(
+    tickIndex: bigint,
+    assets: Array<{ key: string; sectorId: number; category: string | null }>,
+    tx: TxClient,
+  ): Promise<ArcAdvanceResult> {
     const instances = await this.arcQuery.findActiveInstances();
     const events: ArcTransitionEvent[] = [];
-    let globalImpact = 0;
+    const assetImpacts: Record<string, number> = {};
+    let completedCount = 0;
 
     for (const inst of instances) {
       const seed = `arc:${inst.id}:${tickIndex}`;
@@ -50,6 +68,7 @@ export class InvestArcService {
 
       if (result.transitioned && isArcCompleted(result.nextState)) {
         await this.arcRepo.deactivateInstance(inst.id, tickIndex, tx);
+        completedCount++;
       } else {
         const newTicks = result.transitioned ? 0 : inst.ticksInCurrentState + 1;
         await this.arcRepo.updateInstanceState(
@@ -61,9 +80,32 @@ export class InvestArcService {
         );
       }
 
-      globalImpact += arcImpactMultiplier(result.nextState);
+      // Compute per-asset impacts from this arc's sector weights
+      const sectorWeights: ArcSectorWeight[] = inst.arcType.sectorImpacts.map(
+        (si) => ({
+          sectorId: si.sectorId,
+          category: si.category,
+          weight: Number(si.weight),
+        }),
+      );
+
+      const impacts = computeArcAssetImpacts(
+        result.nextState,
+        sectorWeights,
+        assets,
+      );
+
+      // Accumulate: multiple arcs may affect the same asset
+      for (const [key, impact] of Object.entries(impacts)) {
+        assetImpacts[key] = (assetImpacts[key] ?? 0) + impact;
+      }
     }
 
-    return { events, globalImpact };
+    return {
+      events,
+      assetImpacts,
+      remainingActiveCount: instances.length - completedCount,
+      activeInstances: instances,
+    };
   }
 }

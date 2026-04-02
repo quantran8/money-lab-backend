@@ -13,7 +13,10 @@ import type {
   IndexWeeklyResolutionResult,
 } from '#budget-simulation/types/index.js';
 import { indexResolveWeek } from '#budget-simulation/domain/index.js';
-import { DEFAULT_HI_START, DEFAULT_LQI_START } from '#budget-simulation/budget-simulation.constant.js';
+import {
+  DEFAULT_HI_START,
+  DEFAULT_LQI_START,
+} from '#budget-simulation/budget-simulation.constant.js';
 import { TxClient } from '#app/prisma/transaction.runner.js';
 
 /**
@@ -78,11 +81,18 @@ export class MonthIndexService {
       forcedRestIncomeLoss: forcedRestNotice?.incomeLoss ?? 0,
     });
 
-    const { hiEnd, lqiEnd, lqiStateEnd, weeklyProgress: weeklyPayload } =
-      indexResult;
+    const {
+      hiEnd,
+      lqiEnd,
+      lqiStateEnd,
+      weeklyProgress: weeklyPayload,
+    } = indexResult;
 
     const currentProgress =
-      (ir.weeklyIndexProgress as Record<string, WeeklyIndexProgressItem> | null) ?? {};
+      (ir.weeklyIndexProgress as Record<
+        string,
+        WeeklyIndexProgressItem
+      > | null) ?? {};
 
     const nextProgress = {
       ...currentProgress,
@@ -104,7 +114,8 @@ export class MonthIndexService {
         ),
         stressEffect: weeklyPayload.stressEffect,
         hiNetChange: hiEnd - Number(ir.hiStart),
-        baselineRecoveryEfficiencyPct: weeklyPayload.baselineRecoveryEfficiencyPct,
+        baselineRecoveryEfficiencyPct:
+          weeklyPayload.baselineRecoveryEfficiencyPct,
         funRecoveryEfficiencyPct: weeklyPayload.funRecoveryEfficiencyPct,
         eventPoolBiasState: lqiStateEnd,
         weeklyIndexProgress: nextProgress,

@@ -11,11 +11,33 @@ export class InvestMarketRepository {
     return tx ?? this.prisma;
   }
 
-  async createTick(
-    data: Prisma.MarketTickUncheckedCreateInput,
+  async createTick(data: Prisma.MarketTickUncheckedCreateInput, tx?: TxClient) {
+    return this.client(tx).marketTick.create({ data });
+  }
+
+  async upsertTickByIndex(
+    tickIndex: bigint,
+    data: Omit<Prisma.MarketTickUncheckedCreateInput, 'tickIndex'>,
     tx?: TxClient,
   ) {
-    return this.client(tx).marketTick.create({ data });
+    return this.client(tx).marketTick.upsert({
+      where: { tickIndex },
+      create: { tickIndex, ...data },
+      update: {},
+    });
+  }
+
+  /**
+   * Resets the market_ticks id sequence to MAX(id) so autoincrement
+   * won't collide with existing rows after a migration reset.
+   */
+  async repairIdSequence(): Promise<void> {
+    await this.prisma.$executeRawUnsafe(
+      `SELECT setval(
+         pg_get_serial_sequence('invest.market_ticks', 'id'),
+         GREATEST(COALESCE((SELECT MAX(id) FROM invest.market_ticks), 0), 1)
+       )`,
+    );
   }
 
   async createPricePoint(

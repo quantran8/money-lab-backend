@@ -4,6 +4,9 @@ CREATE SCHEMA IF NOT EXISTS "budget";
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "invest";
 
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "app_user" (
     "id" UUID NOT NULL,
@@ -59,7 +62,7 @@ CREATE TABLE "lessons" (
 );
 
 -- CreateTable
-CREATE TABLE "UserLessonProgress" (
+CREATE TABLE "user_lesson_progress" (
     "id" BIGSERIAL NOT NULL,
     "user_id" UUID NOT NULL,
     "lesson_id" BIGINT NOT NULL,
@@ -69,18 +72,18 @@ CREATE TABLE "UserLessonProgress" (
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "UserLessonProgress_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "user_lesson_progress_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "budget"."module_event_pool_weights" (
+CREATE TABLE "budget"."event_pool_weights" (
     "id" BIGSERIAL NOT NULL,
     "module_id" SMALLINT NOT NULL,
     "lqi_state" TEXT NOT NULL,
     "event_category" TEXT NOT NULL,
     "weight" DECIMAL NOT NULL,
 
-    CONSTRAINT "module_event_pool_weights_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "event_pool_weights_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -425,7 +428,7 @@ CREATE TABLE "invest"."portfolio_positions" (
     "id" BIGSERIAL NOT NULL,
     "user_id" UUID NOT NULL,
     "asset_id" BIGINT NOT NULL,
-    "quantity" INTEGER NOT NULL DEFAULT 0,
+    "quantity" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "avg_buy_price" INTEGER NOT NULL DEFAULT 0,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -440,7 +443,7 @@ CREATE TABLE "invest"."portfolio_transactions" (
     "asset_id" BIGINT NOT NULL,
     "tick_id" BIGINT NOT NULL,
     "side" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
+    "quantity" DOUBLE PRECISION NOT NULL,
     "price_per_unit" INTEGER NOT NULL,
     "total_amount" INTEGER NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -714,16 +717,16 @@ CREATE UNIQUE INDEX "user_module_progress_user_id_module_id_key" ON "user_module
 CREATE INDEX "idx_lessons_module_order" ON "lessons"("module_id", "order_index");
 
 -- CreateIndex
-CREATE INDEX "idx_ulp_lesson" ON "UserLessonProgress"("lesson_id");
+CREATE INDEX "idx_ulp_lesson" ON "user_lesson_progress"("lesson_id");
 
 -- CreateIndex
-CREATE INDEX "idx_ulp_user" ON "UserLessonProgress"("user_id");
+CREATE INDEX "idx_ulp_user" ON "user_lesson_progress"("user_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "UserLessonProgress_user_id_lesson_id_key" ON "UserLessonProgress"("user_id", "lesson_id");
+CREATE UNIQUE INDEX "user_lesson_progress_user_id_lesson_id_key" ON "user_lesson_progress"("user_id", "lesson_id");
 
 -- CreateIndex
-CREATE INDEX "idx_event_pool_weights_module_lqi" ON "budget"."module_event_pool_weights"("module_id", "lqi_state");
+CREATE INDEX "idx_event_pool_weights_module_lqi" ON "budget"."event_pool_weights"("module_id", "lqi_state");
 
 -- CreateIndex
 CREATE INDEX "idx_job_levels_job" ON "budget"."job_levels"("job_id");
@@ -945,13 +948,13 @@ ALTER TABLE "user_module_progress" ADD CONSTRAINT "user_module_progress_user_id_
 ALTER TABLE "lessons" ADD CONSTRAINT "lessons_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "modules"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "UserLessonProgress" ADD CONSTRAINT "UserLessonProgress_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lessons"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "user_lesson_progress" ADD CONSTRAINT "user_lesson_progress_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lessons"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "UserLessonProgress" ADD CONSTRAINT "UserLessonProgress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "app_user"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "user_lesson_progress" ADD CONSTRAINT "user_lesson_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "app_user"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "budget"."module_event_pool_weights" ADD CONSTRAINT "module_event_pool_weights_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "modules"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "budget"."event_pool_weights" ADD CONSTRAINT "event_pool_weights_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "modules"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "budget"."job_levels" ADD CONSTRAINT "job_levels_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "budget"."jobs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -975,10 +978,10 @@ ALTER TABLE "budget"."runs" ADD CONSTRAINT "runs_user_id_fkey" FOREIGN KEY ("use
 ALTER TABLE "budget"."commitment_templates" ADD CONSTRAINT "commitment_templates_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "modules"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "budget"."user_run_commitments" ADD CONSTRAINT "user_run_commitments_run_id_fkey" FOREIGN KEY ("run_id") REFERENCES "budget"."runs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "budget"."user_run_commitments" ADD CONSTRAINT "user_run_commitments_commitment_template_id_fkey" FOREIGN KEY ("commitment_template_id") REFERENCES "budget"."commitment_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "budget"."user_run_commitments" ADD CONSTRAINT "user_run_commitments_commitment_template_id_fkey" FOREIGN KEY ("commitment_template_id") REFERENCES "budget"."commitment_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "budget"."user_run_commitments" ADD CONSTRAINT "user_run_commitments_run_id_fkey" FOREIGN KEY ("run_id") REFERENCES "budget"."runs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "budget"."run_months" ADD CONSTRAINT "run_months_run_id_fkey" FOREIGN KEY ("run_id") REFERENCES "budget"."runs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -999,13 +1002,13 @@ ALTER TABLE "budget"."life_event_templates" ADD CONSTRAINT "life_event_templates
 ALTER TABLE "budget"."life_event_options" ADD CONSTRAINT "life_event_options_event_template_id_fkey" FOREIGN KEY ("event_template_id") REFERENCES "budget"."life_event_templates"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "budget"."month_events" ADD CONSTRAINT "month_events_month_id_fkey" FOREIGN KEY ("month_id") REFERENCES "budget"."run_months"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
-
--- AddForeignKey
 ALTER TABLE "budget"."month_events" ADD CONSTRAINT "month_events_chosen_option_id_fkey" FOREIGN KEY ("chosen_option_id") REFERENCES "budget"."life_event_options"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "budget"."month_events" ADD CONSTRAINT "month_events_event_template_id_fkey" FOREIGN KEY ("event_template_id") REFERENCES "budget"."life_event_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "budget"."month_events" ADD CONSTRAINT "month_events_month_id_fkey" FOREIGN KEY ("month_id") REFERENCES "budget"."run_months"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "invest"."assets" ADD CONSTRAINT "assets_sector_id_fkey" FOREIGN KEY ("sector_id") REFERENCES "invest"."sectors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
@@ -1020,10 +1023,10 @@ ALTER TABLE "invest"."asset_price_points" ADD CONSTRAINT "asset_price_points_ass
 ALTER TABLE "invest"."asset_price_points" ADD CONSTRAINT "asset_price_points_tick_id_fkey" FOREIGN KEY ("tick_id") REFERENCES "invest"."market_ticks"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."market_event_log" ADD CONSTRAINT "market_event_log_tick_id_fkey" FOREIGN KEY ("tick_id") REFERENCES "invest"."market_ticks"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."market_event_log" ADD CONSTRAINT "market_event_log_event_template_id_fkey" FOREIGN KEY ("event_template_id") REFERENCES "invest"."market_event_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."market_event_log" ADD CONSTRAINT "market_event_log_event_template_id_fkey" FOREIGN KEY ("event_template_id") REFERENCES "invest"."market_event_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."market_event_log" ADD CONSTRAINT "market_event_log_tick_id_fkey" FOREIGN KEY ("tick_id") REFERENCES "invest"."market_ticks"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "invest"."user_credits" ADD CONSTRAINT "user_credits_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "app_user"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -1047,10 +1050,10 @@ ALTER TABLE "invest"."portfolio_transactions" ADD CONSTRAINT "portfolio_transact
 ALTER TABLE "invest"."sim_news_items" ADD CONSTRAINT "sim_news_items_tick_id_fkey" FOREIGN KEY ("tick_id") REFERENCES "invest"."market_ticks"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."sim_news_asset_impacts" ADD CONSTRAINT "sim_news_asset_impacts_news_id_fkey" FOREIGN KEY ("news_id") REFERENCES "invest"."sim_news_items"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "invest"."sim_news_asset_impacts" ADD CONSTRAINT "sim_news_asset_impacts_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "invest"."assets"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."sim_news_asset_impacts" ADD CONSTRAINT "sim_news_asset_impacts_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "invest"."assets"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."sim_news_asset_impacts" ADD CONSTRAINT "sim_news_asset_impacts_news_id_fkey" FOREIGN KEY ("news_id") REFERENCES "invest"."sim_news_items"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "invest"."sim_news_sector_impacts" ADD CONSTRAINT "sim_news_sector_impacts_news_id_fkey" FOREIGN KEY ("news_id") REFERENCES "invest"."sim_news_items"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -1059,10 +1062,10 @@ ALTER TABLE "invest"."sim_news_sector_impacts" ADD CONSTRAINT "sim_news_sector_i
 ALTER TABLE "invest"."sim_news_sector_impacts" ADD CONSTRAINT "sim_news_sector_impacts_sector_id_fkey" FOREIGN KEY ("sector_id") REFERENCES "invest"."sectors"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."asset_spotlight_instances" ADD CONSTRAINT "asset_spotlight_instances_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "invest"."asset_spotlight_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."asset_spotlight_instances" ADD CONSTRAINT "asset_spotlight_instances_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "invest"."assets"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."asset_spotlight_instances" ADD CONSTRAINT "asset_spotlight_instances_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "invest"."assets"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."asset_spotlight_instances" ADD CONSTRAINT "asset_spotlight_instances_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "invest"."asset_spotlight_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "invest"."world_arc_instances" ADD CONSTRAINT "world_arc_instances_arc_type_id_fkey" FOREIGN KEY ("arc_type_id") REFERENCES "invest"."world_arc_types"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
@@ -1071,10 +1074,10 @@ ALTER TABLE "invest"."world_arc_instances" ADD CONSTRAINT "world_arc_instances_a
 ALTER TABLE "invest"."policy_thread_instances" ADD CONSTRAINT "policy_thread_instances_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "invest"."policy_thread_templates"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."behavior_windows" ADD CONSTRAINT "behavior_windows_start_tick_index_fkey" FOREIGN KEY ("start_tick_index") REFERENCES "invest"."market_ticks"("tick_index") ON DELETE RESTRICT ON UPDATE NO ACTION;
+ALTER TABLE "invest"."behavior_windows" ADD CONSTRAINT "behavior_windows_end_tick_index_fkey" FOREIGN KEY ("end_tick_index") REFERENCES "invest"."market_ticks"("tick_index") ON DELETE SET NULL ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "invest"."behavior_windows" ADD CONSTRAINT "behavior_windows_end_tick_index_fkey" FOREIGN KEY ("end_tick_index") REFERENCES "invest"."market_ticks"("tick_index") ON DELETE SET NULL ON UPDATE NO ACTION;
+ALTER TABLE "invest"."behavior_windows" ADD CONSTRAINT "behavior_windows_start_tick_index_fkey" FOREIGN KEY ("start_tick_index") REFERENCES "invest"."market_ticks"("tick_index") ON DELETE RESTRICT ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "invest"."user_behavior_snapshots" ADD CONSTRAINT "user_behavior_snapshots_window_id_fkey" FOREIGN KEY ("window_id") REFERENCES "invest"."behavior_windows"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -1093,3 +1096,4 @@ ALTER TABLE "invest"."user_missions" ADD CONSTRAINT "user_missions_mission_id_fk
 
 -- AddForeignKey
 ALTER TABLE "invest"."sim_reports" ADD CONSTRAINT "sim_reports_tick_index_fkey" FOREIGN KEY ("tick_index") REFERENCES "invest"."market_ticks"("tick_index") ON DELETE RESTRICT ON UPDATE NO ACTION;
+

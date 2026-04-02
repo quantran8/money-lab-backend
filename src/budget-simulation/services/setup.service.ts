@@ -1,8 +1,4 @@
-import {
-  HttpException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { RunQuery } from '../queries/run.query';
 import { CommitmentQuery } from '../queries/commitment.query';
 import { CommitmentLayer } from '../budget-simulation.enum';

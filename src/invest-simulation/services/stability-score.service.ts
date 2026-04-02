@@ -86,7 +86,7 @@ export class InvestStabilityScoreService {
       const balance = credit?.balance ?? 0;
 
       // Build price map
-      let priceMap: PriceMap = {};
+      const priceMap: PriceMap = {};
       if (tick) {
         const prices = await this.marketQuery.findLatestPrices(tick.id);
         for (const p of prices) {
@@ -107,33 +107,41 @@ export class InvestStabilityScoreService {
 
       // Sector and holding duration
       const sectorSet = new Set(posInputs.map((p) => p.sectorCode));
-      const avgHoldingDuration = positions.length > 0
-        ? positions.reduce((s, p) => {
-            const ageMs = Date.now() - p.createdAt.getTime();
-            return s + ageMs / (1000 * 60 * 60 * 24); // days
-          }, 0) / positions.length
-        : 0;
+      const avgHoldingDuration =
+        positions.length > 0
+          ? positions.reduce((s, p) => {
+              const ageMs = Date.now() - p.createdAt.getTime();
+              return s + ageMs / (1000 * 60 * 60 * 24); // days
+            }, 0) / positions.length
+          : 0;
 
       // Average behavior scores
-      const avgTurnover = snapshots.length > 0
-        ? snapshots.reduce((s, snap) => s + Number(snap.turnoverScore), 0) / snapshots.length
-        : 0;
-      const avgVolatilityChasing = snapshots.length > 0
-        ? snapshots.reduce((s, snap) => s + Number(snap.volatilityChasingScore), 0) / snapshots.length
-        : 0;
+      const avgTurnover =
+        snapshots.length > 0
+          ? snapshots.reduce((s, snap) => s + Number(snap.turnoverScore), 0) /
+            snapshots.length
+          : 0;
+      const avgVolatilityChasing =
+        snapshots.length > 0
+          ? snapshots.reduce(
+              (s, snap) => s + Number(snap.volatilityChasingScore),
+              0,
+            ) / snapshots.length
+          : 0;
 
       // Concentration HHI
       const totalValue = posInputs.reduce((s, p) => {
         const price = priceMap[p.assetId.toString()] ?? 0;
         return s + p.quantity * price;
       }, 0);
-      const hhi = totalValue > 0
-        ? posInputs.reduce((s, p) => {
-            const price = priceMap[p.assetId.toString()] ?? 0;
-            const share = (p.quantity * price) / totalValue;
-            return s + share * share;
-          }, 0)
-        : 0;
+      const hhi =
+        totalValue > 0
+          ? posInputs.reduce((s, p) => {
+              const price = priceMap[p.assetId.toString()] ?? 0;
+              const share = (p.quantity * price) / totalValue;
+              return s + share * share;
+            }, 0)
+          : 0;
 
       // 3. Compute stability (pure domain)
       const stability = computeStabilityFactor({

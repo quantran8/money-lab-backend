@@ -44,14 +44,33 @@ export interface MatchedMission {
   missionCode: string;
 }
 
-function matchesMissionCondition(state: UserState, cond: MissionCondition): boolean {
-  if (cond.minSnapshots != null && state.snapshotCount < cond.minSnapshots) return false;
-  if (cond.maxAvgTurnover != null && state.avgTurnover > cond.maxAvgTurnover) return false;
-  if (cond.minAvgTurnover != null && state.avgTurnover < cond.minAvgTurnover) return false;
-  if (cond.minStabilityFactor != null && state.stabilityFactor < cond.minStabilityFactor) return false;
-  if (cond.minSectorCount != null && state.sectorCount < cond.minSectorCount) return false;
-  if (cond.minPositionCount != null && state.positionCount < cond.minPositionCount) return false;
-  if (cond.maxAvgVolatilityChasing != null && state.avgVolatilityChasing > cond.maxAvgVolatilityChasing) return false;
+function matchesMissionCondition(
+  state: UserState,
+  cond: MissionCondition,
+): boolean {
+  if (cond.minSnapshots != null && state.snapshotCount < cond.minSnapshots)
+    return false;
+  if (cond.maxAvgTurnover != null && state.avgTurnover > cond.maxAvgTurnover)
+    return false;
+  if (cond.minAvgTurnover != null && state.avgTurnover < cond.minAvgTurnover)
+    return false;
+  if (
+    cond.minStabilityFactor != null &&
+    state.stabilityFactor < cond.minStabilityFactor
+  )
+    return false;
+  if (cond.minSectorCount != null && state.sectorCount < cond.minSectorCount)
+    return false;
+  if (
+    cond.minPositionCount != null &&
+    state.positionCount < cond.minPositionCount
+  )
+    return false;
+  if (
+    cond.maxAvgVolatilityChasing != null &&
+    state.avgVolatilityChasing > cond.maxAvgVolatilityChasing
+  )
+    return false;
   return true;
 }
 
@@ -67,7 +86,7 @@ export function matchMissions(
 
   for (const mission of missions) {
     if (state.assignedMissionCodes.has(mission.code)) continue;
-    const cond = mission.condition as MissionCondition;
+    const cond = mission.condition;
     if (matchesMissionCondition(state, cond)) {
       matched.push({ missionId: mission.id, missionCode: mission.code });
     }

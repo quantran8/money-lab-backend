@@ -30,6 +30,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-fastify": "^11.1.14",
+    "@nestjs/schedule": "^6.1.1",
     "@prisma/client": "^6.19.2",
     "@supabase/supabase-js": "^2.98.0",
     "class-transformer": "^0.5.1",

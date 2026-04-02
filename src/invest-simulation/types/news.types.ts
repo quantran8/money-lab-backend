@@ -12,7 +12,11 @@ export type NewsWithImpactsRow = Prisma.SimNewsItemGetPayload<{
 }>;
 
 /** News asset impact row. */
-export type NewsAssetImpactRow = Prisma.SimNewsAssetImpactGetPayload<Record<string, never>>;
+export type NewsAssetImpactRow = Prisma.SimNewsAssetImpactGetPayload<
+  Record<string, never>
+>;
 
 /** News sector impact row. */
-export type NewsSectorImpactRow = Prisma.SimNewsSectorImpactGetPayload<Record<string, never>>;
+export type NewsSectorImpactRow = Prisma.SimNewsSectorImpactGetPayload<
+  Record<string, never>
+>;

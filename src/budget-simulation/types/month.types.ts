@@ -87,8 +87,9 @@ export type MonthWithRunAndModule = Prisma.RunMonthGetPayload<{
 
 export type MonthJarRow = Prisma.MonthJarGetPayload<Record<string, never>>;
 
-export type PendingMonthEventRow =
-  Prisma.MonthEventGetPayload<Record<string, never>>;
+export type PendingMonthEventRow = Prisma.MonthEventGetPayload<
+  Record<string, never>
+>;
 
 export type PendingEventWithTemplateRow = Prisma.MonthEventGetPayload<{
   include: {

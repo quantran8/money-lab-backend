@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#app/prisma/prisma.service.js';
-import type { AssetRow, AssetWithSectorRow, SectorRow } from '../types/index.js';
+import type {
+  AssetRow,
+  AssetWithSectorRow,
+  SectorRow,
+} from '../types/index.js';
 
 export interface AssetFilter {
   sectorId?: number;
   search?: string;
+  category?: string;
 }
 
 @Injectable()
@@ -27,14 +32,17 @@ export class AssetQuery {
   async findAllWithSector(
     filter: AssetFilter = {},
     limit: number = 50,
-    offset: number = 0,
+    cursor?: bigint,
   ): Promise<AssetWithSectorRow[]> {
     return this.prisma.asset.findMany({
       where: this.buildWhere(filter),
       include: { sector: true },
       orderBy: { id: 'asc' },
       take: limit,
-      skip: offset,
+      ...(cursor != null && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
     });
   }
 
@@ -48,6 +56,7 @@ export class AssetQuery {
     return {
       isActive: true,
       ...(filter.sectorId != null && { sectorId: filter.sectorId }),
+      ...(filter.category != null && { category: filter.category }),
       ...(filter.search != null && {
         OR: [
           { name: { contains: filter.search, mode: 'insensitive' as const } },
@@ -55,6 +64,20 @@ export class AssetQuery {
         ],
       }),
     };
+  }
+
+  async findDistinctCategories(sectorId?: number): Promise<string[]> {
+    const rows = await this.prisma.asset.findMany({
+      where: {
+        isActive: true,
+        category: { not: null },
+        ...(sectorId != null && { sectorId }),
+      },
+      select: { category: true },
+      distinct: ['category'],
+      orderBy: { category: 'asc' },
+    });
+    return rows.map((r) => r.category!);
   }
 
   async findById(assetId: bigint): Promise<AssetWithSectorRow | null> {

@@ -11,7 +11,10 @@ import {
 
 /** Clamp a new price within per-tick guardrails relative to previous price. */
 export function clampPrice(newPrice: number, prevPrice: number): number {
-  const minAllowed = Math.max(PRICE_FLOOR, Math.round(prevPrice * (1 - MAX_TICK_DROP_PCT)));
+  const minAllowed = Math.max(
+    PRICE_FLOOR,
+    Math.round(prevPrice * (1 - MAX_TICK_DROP_PCT)),
+  );
   const maxAllowed = Math.round(prevPrice * (1 + MAX_TICK_RISE_PCT));
   return Math.max(minAllowed, Math.min(maxAllowed, Math.round(newPrice)));
 }
@@ -22,7 +25,10 @@ export function roundPrice(price: number): number {
 }
 
 /** Calculate percentage change between two prices (as a fraction, e.g. 0.05 = 5%). */
-export function calculateChangePct(prevPrice: number, newPrice: number): number {
+export function calculateChangePct(
+  prevPrice: number,
+  newPrice: number,
+): number {
   if (prevPrice === 0) return 0;
   return (newPrice - prevPrice) / prevPrice;
 }

@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#app/prisma/prisma.service.js';
-import type { ReflectionTemplateRow, UserReflectionWithTemplateRow } from '../types/index.js';
+import type {
+  ReflectionTemplateRow,
+  UserReflectionWithTemplateRow,
+} from '../types/index.js';
 
 @Injectable()
 export class InvestReflectionQuery {
@@ -12,7 +15,10 @@ export class InvestReflectionQuery {
     });
   }
 
-  async findUserReflections(userId: string, limit: number = 20): Promise<UserReflectionWithTemplateRow[]> {
+  async findUserReflections(
+    userId: string,
+    limit: number = 20,
+  ): Promise<UserReflectionWithTemplateRow[]> {
     return this.prisma.userReflection.findMany({
       where: { userId },
       include: { template: true },

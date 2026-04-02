@@ -36,7 +36,7 @@ const MIN_DWELL: Record<ArcState, number> = {
 
 const TRANSITION_PROB: Record<ArcState, number> = {
   background: 0, // spawned externally
-  spark: 0.20,
+  spark: 0.2,
   expansion: 0.15,
   integration: 0.25,
   absorbed: 0, // terminal
@@ -72,7 +72,8 @@ export function transitionArc(input: ArcTransitionInput): ArcTransitionResult {
 
   // Calculate intra-state progress
   const dwell = MIN_DWELL[currentState];
-  const progressInState = dwell > 0 ? Math.min(1, ticksInCurrentState / (dwell * 2)) : 0;
+  const progressInState =
+    dwell > 0 ? Math.min(1, ticksInCurrentState / (dwell * 2)) : 0;
   const base = STATE_PROGRESS_BASE[currentState];
   const nextBase = STATE_PROGRESS_BASE[NEXT_STATE[currentState]];
   const progress = Math.min(1, base + (nextBase - base) * progressInState);
@@ -93,15 +94,68 @@ export function transitionArc(input: ArcTransitionInput): ArcTransitionResult {
   return { nextState: currentState, transitioned: false, progress };
 }
 
-/** Broad market impact multiplier per arc state. */
-export function arcImpactMultiplier(state: ArcState): number {
-  switch (state) {
-    case 'background': return 0;
-    case 'spark': return 0.01;
-    case 'expansion': return 0.03;
-    case 'integration': return 0.02;
-    case 'absorbed': return 0;
+/** Base magnitude per arc state (unsigned). */
+const ARC_IMPACT_MAGNITUDE: Record<ArcState, number> = {
+  background: 0,
+  spark: 0.01,
+  expansion: 0.03,
+  integration: 0.02,
+  absorbed: 0,
+};
+
+/** Sector weight for an arc type. */
+export interface ArcSectorWeight {
+  sectorId: number;
+  category: string | null;
+  weight: number;
+}
+
+/**
+ * Compute per-asset arc impact for a single arc instance.
+ * Returns a map of assetKey → impact value.
+ *
+ * @param state          Current arc state.
+ * @param sectorWeights  Weights per sector/category from WorldArcSectorImpact.
+ * @param assets         All active assets with their sectorId and category.
+ * @returns              Record<assetKey, impact> for assets that have a matching weight.
+ */
+export function computeArcAssetImpacts(
+  state: ArcState,
+  sectorWeights: ArcSectorWeight[],
+  assets: Array<{ key: string; sectorId: number; category: string | null }>,
+): Record<string, number> {
+  const magnitude = ARC_IMPACT_MAGNITUDE[state];
+  if (magnitude === 0) return {};
+
+  // Build lookup: sectorId → category-specific weight, sectorId → sector-wide weight
+  const categoryMap = new Map<string, number>(); // "sectorId:category" → weight
+  const sectorMap = new Map<number, number>(); // sectorId → weight (category=null)
+
+  for (const sw of sectorWeights) {
+    if (sw.category != null) {
+      categoryMap.set(`${sw.sectorId}:${sw.category}`, sw.weight);
+    } else {
+      sectorMap.set(sw.sectorId, sw.weight);
+    }
   }
+
+  const impacts: Record<string, number> = {};
+
+  for (const asset of assets) {
+    // Category-specific weight takes precedence over sector-wide weight
+    const catKey =
+      asset.category != null ? `${asset.sectorId}:${asset.category}` : null;
+    const weight =
+      (catKey != null ? categoryMap.get(catKey) : undefined) ??
+      sectorMap.get(asset.sectorId) ??
+      0;
+
+    if (weight !== 0) {
+      impacts[asset.key] = magnitude * weight;
+    }
+  }
+
+  return impacts;
 }
 
 export function isArcActive(state: ArcState): boolean {

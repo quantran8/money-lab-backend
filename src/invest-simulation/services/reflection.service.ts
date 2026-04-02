@@ -23,7 +23,8 @@ export class InvestReflectionService {
 
   async getUserReflections(userId: string) {
     return wrapAsync(this.logger, 'getUserReflections', async () => {
-      const reflections = await this.reflectionQuery.findUserReflections(userId);
+      const reflections =
+        await this.reflectionQuery.findUserReflections(userId);
       return reflections.map((r) => ({
         id: r.id.toString(),
         tickIndex: Number(r.tickIndex),
