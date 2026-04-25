@@ -453,18 +453,19 @@ model Asset {
 }
 
 model MarketTick {
-  id                   BigInt                 @id @default(autoincrement())
-  tickIndex            BigInt                 @unique @map("tick_index")
-  simDay               Int                    @default(0) @map("sim_day")
-  simMonth             Int                    @default(0) @map("sim_month")
-  simYear              Int                    @default(0) @map("sim_year")
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                   BigInt                   @id @default(autoincrement())
+  tickIndex            BigInt                   @unique @map("tick_index")
+  simDay               Int                      @default(0) @map("sim_day")
+  simMonth             Int                      @default(0) @map("sim_month")
+  simYear              Int                      @default(0) @map("sim_year")
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   pricePoints          AssetPricePoint[]
-  behaviorWindowEnds   BehaviorWindow[]       @relation("BehaviorWindowEndTick")
-  behaviorWindowStarts BehaviorWindow[]       @relation("BehaviorWindowStartTick")
+  behaviorWindowEnds   BehaviorWindow[]         @relation("BehaviorWindowEndTick")
+  behaviorWindowStarts BehaviorWindow[]         @relation("BehaviorWindowStartTick")
   events               MarketEventLog[]
   transactions         PortfolioTransaction[]
   newsItems            SimNewsItem[]
+  portfolioSnapshots   PortfolioValueSnapshot[]
   reports              SimReport[]
   reflections          UserReflection[]
   stabilityMetrics     UserStabilityMetric[]
@@ -543,6 +544,20 @@ model UserCredit {
   user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("user_credits")
+  @@schema("invest")
+}
+
+model PortfolioValueSnapshot {
+  id         BigInt     @id @default(autoincrement())
+  userId     String     @map("user_id") @db.Uuid
+  tickIndex  BigInt     @map("tick_index")
+  totalValue Int        @map("total_value")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  tick       MarketTick @relation(fields: [tickIndex], references: [tickIndex], onUpdate: NoAction)
+
+  @@unique([userId, tickIndex])
+  @@index([userId, tickIndex], map: "idx_pv_snapshot_user_tick")
+  @@map("portfolio_value_snapshots")
   @@schema("invest")
 }
 

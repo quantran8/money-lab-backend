@@ -9,6 +9,8 @@ import { InvestStabilityScoreService } from './services/stability-score.service.
 import { InvestReflectionService } from './services/reflection.service.js';
 import { MissionService } from './services/mission.service.js';
 import { InvestReportService } from './services/report.service.js';
+import { InvestDashboardService } from './services/dashboard.service.js';
+import type { BalanceChartPeriod } from './invest-simulation.constant.js';
 
 @Injectable()
 export class InvestSimulationService {
@@ -23,6 +25,7 @@ export class InvestSimulationService {
     private readonly reflection: InvestReflectionService,
     private readonly mission: MissionService,
     private readonly report: InvestReportService,
+    private readonly dashboard: InvestDashboardService,
   ) {}
 
   // ── Market ───────────────────────────────────────────────────────
@@ -134,5 +137,15 @@ export class InvestSimulationService {
 
   async getLatestReport(userId: string) {
     return this.report.getLatestReport(userId);
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────
+
+  async getDashboard(userId: string) {
+    return this.dashboard.getDashboard(userId);
+  }
+
+  async getBalanceChart(userId: string, period?: BalanceChartPeriod) {
+    return this.dashboard.getBalanceChart(userId, period);
   }
 }

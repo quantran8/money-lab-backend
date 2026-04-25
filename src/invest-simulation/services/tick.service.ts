@@ -4,6 +4,7 @@ import { wrapAsync } from '#common/utils/async.utils.js';
 import { AssetQuery } from '../queries/asset.query.js';
 import { InvestMarketQuery } from '../queries/market.query.js';
 import { InvestMarketRepository } from '../repositories/market.repository.js';
+import { InvestPortfolioRepository } from '../repositories/portfolio.repository.js';
 import { InvestSpotlightService } from './spotlight.service.js';
 import { InvestArcService } from './arc.service.js';
 import { InvestPolicyService } from './policy.service.js';
@@ -23,6 +24,7 @@ export class InvestTickService {
     private readonly assetQuery: AssetQuery,
     private readonly marketQuery: InvestMarketQuery,
     private readonly marketRepo: InvestMarketRepository,
+    private readonly portfolioRepo: InvestPortfolioRepository,
     private readonly spotlightService: InvestSpotlightService,
     private readonly arcService: InvestArcService,
     private readonly policyService: InvestPolicyService,
@@ -174,6 +176,11 @@ export class InvestTickService {
               tx,
             );
 
+          // 3g-snap. Snapshot portfolio value (credits + position market value)
+          // for every user with credits at this tick. Single SQL aggregation.
+          const portfolioSnapshotsCreated =
+            await this.portfolioRepo.snapshotAllUsersAtTick(nextTickIndex, tx);
+
           // 3h. Create world state snapshot
           await this.marketRepo.createWorldState(
             {
@@ -189,6 +196,7 @@ export class InvestTickService {
                 newsGenerated: allEvents.length,
                 behaviorWindowsClosed: closedWindowIds.length,
                 behaviorSnapshotsCreated: snapshotsCreated,
+                portfolioSnapshotsCreated,
                 spawnedSpotlights: spawnResult.spawnedSpotlightEvents.length,
                 spawnedArcs: spawnResult.spawnedArcEvents.length,
                 spawnedPolicies: spawnResult.spawnedPolicyEvents.length,
@@ -208,6 +216,7 @@ export class InvestTickService {
             newsGenerated: allEvents.length,
             windowsClosed: closedWindowIds.length,
             snapshotsCreated,
+            portfolioSnapshotsCreated,
             spawnedSpotlights: spawnResult.spawnedSpotlightEvents.length,
             spawnedArcs: spawnResult.spawnedArcEvents.length,
             spawnedPolicies: spawnResult.spawnedPolicyEvents.length,
@@ -223,7 +232,8 @@ export class InvestTickService {
           `${result.policyTransitions} policy, ` +
           `${result.newsGenerated} news, ` +
           `${result.windowsClosed} windows closed, ` +
-          `${result.snapshotsCreated} snapshots, ` +
+          `${result.snapshotsCreated} behavior snapshots, ` +
+          `${result.portfolioSnapshotsCreated} portfolio snapshots, ` +
           `spawned: ${result.spawnedSpotlights}s/${result.spawnedArcs}a/${result.spawnedPolicies}p`,
       );
 

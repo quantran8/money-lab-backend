@@ -170,3 +170,26 @@ export type {
 export { buildReport } from './report/report-builder.js';
 
 export type { ReportInput, ReportData } from './report/report-builder.js';
+
+// Dashboard helpers
+export {
+  mapArcStateLabel,
+  mapArcProgressLabel,
+  mapPolicyStateLabel,
+  mapStabilityLabel,
+  extractPolicyStateDescription,
+} from './dashboard/dashboard-helpers.js';
+
+export {
+  computeSectorPulse,
+  mapSectorPulseLabel,
+} from './dashboard/sector-pulse.js';
+
+export type {
+  SectorRef,
+  SectorPulseArcInput,
+  SectorPulsePolicyInput,
+  SectorPulseSpotlightInput,
+  SectorPulseInput,
+  SectorPulseEntry,
+} from './dashboard/sector-pulse.js';

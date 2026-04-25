@@ -105,4 +105,50 @@ export class InvestPortfolioRepository {
       create: { userId, balance: initialBalance },
     });
   }
+
+  /**
+   * Bulk insert portfolio value snapshots for many users at one tick.
+   * Skips duplicates so the call is idempotent if a tick is replayed.
+   */
+  async createValueSnapshots(
+    data: Array<{ userId: string; tickIndex: bigint; totalValue: number }>,
+    tx?: TxClient,
+  ): Promise<void> {
+    if (data.length === 0) return;
+    await this.client(tx).portfolioValueSnapshot.createMany({
+      data,
+      skipDuplicates: true,
+    });
+  }
+
+  /**
+   * Snapshot total portfolio value (credits + position market value) for ALL
+   * users with credits at the given tick. Single SQL statement that joins
+   * user_credits, portfolio_positions, and asset_price_points so the cost
+   * does not scale with the number of users on the JS side.
+   */
+  async snapshotAllUsersAtTick(
+    tickIndex: bigint,
+    tx?: TxClient,
+  ): Promise<number> {
+    const client = this.client(tx);
+    const result = await (client as PrismaService).$executeRaw`
+      INSERT INTO invest.portfolio_value_snapshots (user_id, tick_index, total_value)
+      SELECT
+        uc.user_id,
+        ${tickIndex}::bigint AS tick_index,
+        uc.balance + COALESCE(SUM(pp.quantity * app.price), 0)::int AS total_value
+      FROM invest.user_credits uc
+      LEFT JOIN invest.portfolio_positions pp
+        ON pp.user_id = uc.user_id AND pp.quantity > 0
+      LEFT JOIN invest.asset_price_points app
+        ON app.asset_id = pp.asset_id
+       AND app.tick_id = (
+         SELECT id FROM invest.market_ticks WHERE tick_index = ${tickIndex}::bigint
+       )
+      GROUP BY uc.user_id, uc.balance
+      ON CONFLICT (user_id, tick_index) DO NOTHING
+    `;
+    return result;
+  }
 }

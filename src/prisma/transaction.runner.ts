@@ -21,7 +21,7 @@ export class TransactionRunner {
     options?: { timeout?: number },
   ): Promise<T> {
     return this.prisma.$transaction(fn, {
-      timeout: options?.timeout,
+      timeout: options?.timeout ?? 60_000,
     });
   }
 }

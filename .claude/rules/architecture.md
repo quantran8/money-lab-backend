@@ -1,9 +1,3 @@
----
-description: Backend architecture rules
-# globs: ["src/**/*.ts"]
-alwaysApply: true
----
-
 This project follows a strict layered architecture.
 
 Controller

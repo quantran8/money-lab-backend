@@ -18,6 +18,7 @@ InvestController → InvestSimulationService (facade)
   → InvestReflectionService
   → InvestMissionService
   → InvestReportService
+  → InvestDashboardService
   → InvestTickService
       → InvestSpotlightService (FSM)
       → InvestArcService (FSM)
@@ -26,6 +27,7 @@ InvestController → InvestSimulationService (facade)
       → InvestPricingService (generation)
       → InvestBehaviorWindowService (open/close)
       → InvestBehaviorEvaluationService (snapshot)
+      → InvestPortfolioRepository (snapshotAllUsersAtTick)
 
 InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
 ```
@@ -34,6 +36,8 @@ InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
 
 | Method | Route | Service Method | Description |
 |--------|-------|---------------|-------------|
+| GET | dashboard | dashboard.getDashboard | Aggregated landing screen: arc, portfolio snapshot + 1d balance chart, sector pulse, latest news, active policies |
+| GET | dashboard/balance-chart?period=1d\|1w\|1m\|1y | dashboard.getBalanceChart | Portfolio value points for the requested period (default 1d) |
 | GET | market/state | marketState.getCurrentMarketState | Current tick + world state |
 | GET | market/prices | marketState.getLatestPrices | Latest prices all assets |
 | GET | assets | asset.getAssetList | All assets with latest price |
@@ -85,6 +89,43 @@ InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
    - `calculateExposure` (by sector, by type)
    - `calculateUnrealizedPnL`
 4. **RETURN**: merged summary
+
+## Dashboard Flow (getDashboard)
+
+Aggregation endpoint — 2 sequential round-trips, 9 Prisma calls (justified exception to 6-query rule; all queries are indexed single-row or small-set lookups, all of round 2 run in parallel).
+
+1. **LOAD round 1** (1 query): `marketQuery.findCurrentTickWithPricesAndSectors()` — single Prisma call returns tick + all price points + each price point's `asset.sectorId` via include. Also derives `sinceTick` for the default 1d window from `tick.tickIndex - BALANCE_CHART_PERIOD_TICKS['1d']`.
+2. **LOAD round 2** (9 queries in `Promise.all`):
+   - `arcQuery.findActiveInstances()` (with arcType + sectorImpacts)
+   - `policyQuery.findActiveInstances()` (with template + sectorImpacts)
+   - `spotlightQuery.findActiveInstances()` (with asset.sector)
+   - `portfolioQuery.findUserCredit(userId)`
+   - `portfolioQuery.findPositionsWithAsset(userId)`
+   - `portfolioQuery.findSnapshotsSinceTick(userId, sinceTick)` — 1d window: returns today + previous, feeds both balance chart and P/L today
+   - `behaviorQuery.findLatestStabilityMetric(userId)`
+   - `newsQuery.findRecent(5)`
+   - `assetQuery.findAllSectors()`
+3. **COMPUTE** (pure domain):
+   - Build `priceMap` and `priceChangeBySector` from tick.pricePoints
+   - `calculatePortfolioSummary` for total value, available credits, position value
+   - P/L today = `latestSnap.totalValue - prevSnap.totalValue` from snapshots (already ascending by tickIndex)
+   - Balance chart = `{ period: '1d', points: snapshots.map(...) }`
+   - `mapStabilityLabel(stabilityFactor)`
+   - Pick most-advanced active arc (highest progress) → `mapArcStateLabel`, `mapArcProgressLabel`
+   - `computeSectorPulse({ sectors, activeArcs, activePolicies, activeSpotlights, priceChangeBySector })` — returns 0–100 index + label per sector
+   - Map news items to slim format
+   - Map active policies → `mapPolicyStateLabel` + `extractPolicyStateDescription` from template JSON
+4. **RETURN**: `{ arc, portfolio, sectorPulse, latestNews, activePolicies }`
+
+## Balance Chart Flow (getBalanceChart)
+
+Lightweight period-specific endpoint — 2 queries:
+
+1. **LOAD**: `marketQuery.findCurrentTick()` → derive `sinceTick = max(0, currentTickIndex - BALANCE_CHART_PERIOD_TICKS[period])`
+2. **LOAD**: `portfolioQuery.findSnapshotsSinceTick(userId, sinceTick)` (ascending by tickIndex, indexed range scan)
+3. **RETURN**: `{ period, points: snapshots.map(s => ({ tickIndex, value: totalValue })) }`
+
+Period query param is validated by `parseBalanceChartPeriod()` in the controller (`BadRequestException` on invalid value). Defaults to `1d` if omitted. Periods come from `BALANCE_CHART_PERIOD_TICKS` constant: `1d=1, 1w=7, 1m=30, 1y=360` ticks (1 tick = 1 day).
 
 ## File Map
 
@@ -144,7 +185,8 @@ InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
    h. Generate prices from combined impacts (sector + spotlight + arc per-asset + policy per-asset + noise)
    i. Open behavior windows from transitions
    j. Close expired windows + evaluate user behavior → snapshots
-   k. Create world state snapshot
+   k. Snapshot portfolio value for all users at this tick via `portfolioRepo.snapshotAllUsersAtTick(nextTickIndex, tx)` — single SQL `INSERT … SELECT` joining user_credits + portfolio_positions + asset_price_points
+   l. Create world state snapshot
 
 ### Phase 2 Domain (pure, no I/O)
 - `domain/pricing/price-generator.ts` — generatePrice, generateTickPrices, combineImpacts
@@ -219,3 +261,17 @@ InvestTickScheduler (cron: every 6h) → InvestTickService.runTick()
 - `services/reflection.service.ts` — InvestReflectionService (generate + read)
 - `services/mission.service.ts` — InvestMissionService (assign + read)
 - `services/report.service.ts` — InvestReportService (generate + read)
+
+### Dashboard
+- `domain/dashboard/dashboard-helpers.ts` — pure label mappers: `mapArcStateLabel`, `mapArcProgressLabel`, `mapPolicyStateLabel`, `mapStabilityLabel`, `extractPolicyStateDescription`
+- `domain/dashboard/sector-pulse.ts` — pure `computeSectorPulse` (0–100 sentiment per sector) + `mapSectorPulseLabel`
+- `types/dashboard.types.ts` — `PortfolioValueSnapshotRow`, `TickWithPricesAndSectorRow`
+- `services/dashboard.service.ts` — InvestDashboardService (Load → Compute → Response, 9 queries / 2 round-trips)
+- `queries/market.query.ts::findCurrentTickWithPricesAndSectors()` — single-query payload (tick + prices + asset.sectorId)
+- `queries/portfolio.query.ts::findRecentSnapshots()` — recent N portfolio value snapshots (desc); legacy helper
+- `queries/portfolio.query.ts::findSnapshotsSinceTick()` — snapshots with tickIndex >= sinceTick (asc); used by dashboard + balance chart
+- `repositories/portfolio.repository.ts::createValueSnapshots()` — batch insert (idempotent via `skipDuplicates`)
+- `repositories/portfolio.repository.ts::snapshotAllUsersAtTick()` — single SQL `INSERT … SELECT` aggregation, called from tick step 3k
+
+### Schema additions
+- `PortfolioValueSnapshot` (`invest.portfolio_value_snapshots`) — `id`, `userId`, `tickIndex` (FK → market_ticks.tick_index), `totalValue`, `createdAt`. Unique (userId, tickIndex). Migration: `prisma/migrations/20260409000000_add_portfolio_value_snapshots/`

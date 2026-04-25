@@ -30,6 +30,7 @@ Financial education simulation where users trade fictional assets in a system-co
 - **InvestUserCredit** — per-user balance (one row per user, unique userId)
 - **InvestPortfolioPosition** — holdings per asset (unique userId+assetId)
 - **InvestPortfolioTransaction** — buy/sell audit log
+- **InvestPortfolioValueSnapshot** — per-user portfolio total value at each tick (credits + position market value), unique (userId, tickIndex). Powers dashboard balance chart and "P/L today" without recomputing from price history. Written by tick engine via single SQL `INSERT … SELECT` aggregation.
 
 ### Phase 2 — News & Events
 - **InvestSimNewsItem** — generated news articles per tick (title, body, tone, intensity, narrativeTag)
@@ -109,7 +110,8 @@ Financial education simulation where users trade fictional assets in a system-co
 5. Generate prices from combined impacts (sector + spotlight + arc + policy + noise)
 6. Open behavior windows from transitions
 7. Close expired behavior windows + evaluate user behavior
-8. Create world state snapshot
+8. Snapshot portfolio value for all users at this tick (single SQL aggregation)
+9. Create world state snapshot
 
 ## Auto-Spawn Rules
 - **Arc-driven spotlight spawn**: When arc transitions to `expansion` or `integration`, spawn up to 2 spotlights on assets with highest affinity (via ArcAssetAffinity), using sentiment-matched templates (via ArcSpotlightTemplate)
@@ -141,6 +143,58 @@ Financial education simulation where users trade fictional assets in a system-co
 - Sector exposure (% allocation), asset type exposure
 - Average volatility, stability score
 - Reflection summary (last 3 reflections joined)
+
+## Dashboard Aggregation
+Single read endpoint that returns the user's invest landing screen. Pure-domain helpers (no I/O):
+
+### Sector Pulse Index (0–100, like Crypto Fear & Greed)
+Per sector signal:
+```
+arc       = Σ ARC_MAGNITUDE(state)    × weight   for active arcs touching the sector
+policy    = Σ POLICY_MAGNITUDE(state) × weight   for active policies touching the sector
+spotlight = Σ SPOTLIGHT_SENTIMENT(state)         for spotlights anchored to the sector
+momentum  = avg(changePct) of the sector's assets at the current tick
+
+raw   = arc + policy + spotlight + momentum
+index = clamp(round(50 + raw × 250), 0, 100)
+```
+ARC_MAGNITUDE / POLICY_MAGNITUDE values mirror the constants in `world-arc.ts` and `policy-thread.ts`.
+SPOTLIGHT_SENTIMENT: dormant 0, emerging +0.005, hype +0.02, peak +0.03, decline -0.015, recovery +0.005.
+
+### Pulse Labels
+- 0–19: "Extreme Fear"
+- 20–39: "Fear"
+- 40–59: "Neutral"
+- 60–79: "Greed"
+- 80–100: "Extreme Greed"
+
+### Stability Labels (mapped from stabilityFactor 0.5–2.0)
+- <0.8: "Volatile"
+- <1.0: "Developing"
+- <1.2: "Stable"
+- <1.5: "Resilient"
+- ≥1.5: "Fortress"
+
+### Arc Stage Labels (from progress 0–1)
+- <0.33: "Early-stage"
+- <0.66: "Mid-stage"
+- <1.0: "Late-stage"
+- ≥1.0: "Complete"
+
+### Arc / Policy State Labels
+Title-cased mappings of the FSM state codes (e.g. `expansion` → "Expansion", `action_2` → "Action II"). Policy state body text is read from each template's `stateDescriptions` JSON column.
+
+### P/L Today
+Computed from the two most recent `PortfolioValueSnapshot` rows for the user: `latest.totalValue - previous.totalValue`. No price-history recomputation needed.
+
+### Balance Chart Periods
+Periods are anchored to the current tick (1 tick = 1 day):
+- `1d` (default): tickIndex >= currentTick - 1 → today + previous (also feeds P/L today)
+- `1w`: tickIndex >= currentTick - 7
+- `1m`: tickIndex >= currentTick - 30
+- `1y`: tickIndex >= currentTick - 360
+
+The dashboard endpoint always returns the `1d` window inline. Other periods are fetched via the dedicated `GET dashboard/balance-chart?period=…` endpoint. The query is a single indexed range scan on `(userId, tickIndex)`; no downsampling is applied — `1y` returns up to 360 raw points and the client may downsample.
 
 ## Phases
 1. **Phase 1** (done): Assets, prices, credits, trading, portfolio — 28 files, 10 Prisma models

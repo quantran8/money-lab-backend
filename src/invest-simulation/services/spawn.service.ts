@@ -322,9 +322,7 @@ export class InvestSpawnService {
       templateId: t.id,
       code: t.code,
       rarity: t.rarity,
-      affectedSectors: [
-        ...new Set(t.sectorImpacts.map((si) => si.sectorId)),
-      ],
+      affectedSectors: [...new Set(t.sectorImpacts.map((si) => si.sectorId))],
     }));
 
     let currentCount = remainingActiveCount;

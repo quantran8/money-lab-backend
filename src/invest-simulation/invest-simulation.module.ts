@@ -51,6 +51,7 @@ import { InvestReflectionService } from './services/reflection.service.js';
 import { MissionService } from './services/mission.service.js';
 import { InvestReportService } from './services/report.service.js';
 import { InvestSpawnService } from './services/spawn.service.js';
+import { InvestDashboardService } from './services/dashboard.service.js';
 
 // Facade
 import { InvestSimulationService } from './invest-simulation.service.js';
@@ -106,6 +107,7 @@ import { InvestSimulationService } from './invest-simulation.service.js';
     MissionService,
     InvestReportService,
     InvestSpawnService,
+    InvestDashboardService,
     // Facade
     InvestSimulationService,
   ],

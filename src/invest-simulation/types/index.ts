@@ -70,3 +70,15 @@ export type {
 } from './mission.types.js';
 
 export type { SimReportRow } from './report.types.js';
+
+export type {
+  PortfolioValueSnapshotRow,
+  TickWithPricesAndSectorRow,
+  BalanceChartPoint,
+  BalanceChartResponse,
+  DashboardArcSnapshot,
+  DashboardPortfolioSnapshot,
+  DashboardNewsItem,
+  DashboardPolicyItem,
+  DashboardResponse,
+} from './dashboard.types.js';

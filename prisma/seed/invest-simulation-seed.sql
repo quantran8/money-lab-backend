@@ -6,9 +6,37 @@
 BEGIN;
 
 -- ============================================================
+-- RESET: Delete all existing data (child tables first)
+-- ============================================================
+-- Child tables referencing seeded tables (must delete first)
+DELETE FROM invest.user_missions;
+DELETE FROM invest.user_reflections;
+DELETE FROM invest.portfolio_transactions;
+DELETE FROM invest.portfolio_positions;
+DELETE FROM invest.asset_price_points;
+DELETE FROM invest.sim_news_asset_impacts;
+DELETE FROM invest.sim_news_sector_impacts;
+
+-- Seeded tables (child → parent order)
+DELETE FROM invest.arc_asset_affinities;
+DELETE FROM invest.arc_spotlight_templates;
+DELETE FROM invest.missions;
+DELETE FROM invest.reflection_templates;
+DELETE FROM invest.policy_thread_instances;
+DELETE FROM invest.asset_spotlight_instances;
+DELETE FROM invest.world_arc_instances;
+DELETE FROM invest.world_arc_sector_impacts;
+DELETE FROM invest.policy_sector_impacts;
+DELETE FROM invest.policy_thread_templates;
+DELETE FROM invest.asset_spotlight_templates;
+DELETE FROM invest.world_arc_types;
+DELETE FROM invest.assets;
+DELETE FROM invest.sectors;
+
+-- ============================================================
 -- 0. SECTORS
 -- ============================================================
-INSERT INTO "invest"."sectors" ("id",
+INSERT INTO invest.sectors ("id",
                                 "code",
                                 "name",
                                 "description",
@@ -21,7 +49,7 @@ VALUES (1, 'stock', 'Stonks 📈', 'Public companies but make it meme', 1, '2026
 -- ============================================================
 -- 0.1. ASSETS
 -- ============================================================
-INSERT INTO "invest"."assets" ("id",
+INSERT INTO invest.assets ("id",
                                "sector_id",
                                "code",
                                "name",
@@ -78,7 +106,7 @@ VALUES (10001, 1, 'APPLZ', 'Pear Inc. 🍐', 'stock', 'medium', 'medium', 'high'
 -- ============================================================
 -- 0.2. WORLD ARC TYPES
 -- ============================================================
-INSERT INTO "invest"."world_arc_types" ("id",
+INSERT INTO invest.world_arc_types ("id",
                                         "code",
                                         "name",
                                         "description")
@@ -381,7 +409,7 @@ INSERT INTO invest.asset_spotlight_instances
 INSERT INTO invest.policy_thread_instances
   (id, template_id, state, ticks_in_current_state, actions_total, actions_completed, started_at_tick, resolved_at_tick, is_active, meta) VALUES
 (1, 4,  'declared_path', 0, 3, 0, 1, NULL, true, '{}'),   -- AI Industry Regulation (affects stocks/tech — aligns with AI Revolution arc)
-(2, 1,  'declared_path', 0, 3, 0, 1, NULL, true, '{}'),   -- Crypto Tax Framework (affects crypto — aligns with Crypto Regulation arc)
+(2, 1,  'declared_path', 0, 3, 0, 1, NULL, true, '{}');   -- Crypto Tax Framework (affects crypto — aligns with Crypto Regulation arc)
 -- (3, 6,  'declared_path', 0, 3, 0, 1, NULL, true, '{}');   -- Interest Rate Freeze (affects stocks + real_estate — aligns with Rate Hike arc)
 
 -- ============================================================

@@ -17,7 +17,7 @@ export const DEFAULT_PRICE_HISTORY_LIMIT = 50;
 // ── Spawn engine constants ──────────────────────────────────────
 
 /** Maximum number of world arcs allowed to run concurrently. */
-export const MAX_ACTIVE_ARCS = 3;
+export const MAX_ACTIVE_ARCS = 2;
 
 /** Maximum number of policy threads allowed to run concurrently. */
 export const MAX_ACTIVE_POLICIES = 2;
@@ -30,3 +30,18 @@ export const POLICY_COOLDOWN_TICKS = 15n;
 
 /** Max spotlights spawned per arc transition into expansion/integration. */
 export const MAX_SPOTLIGHTS_PER_ARC_TRANSITION = 10;
+
+// ── Dashboard balance chart periods ─────────────────────────────
+
+/** Supported balance-chart periods. 1 tick = 1 day in sim calendar. */
+export type BalanceChartPeriod = '1d' | '1w' | '1m' | '1y';
+
+export const DEFAULT_BALANCE_CHART_PERIOD: BalanceChartPeriod = '1d';
+
+/** Window size in ticks for each period (1 tick = 1 day). */
+export const BALANCE_CHART_PERIOD_TICKS: Record<BalanceChartPeriod, number> = {
+  '1d': 1,
+  '1w': 7,
+  '1m': 30,
+  '1y': 360,
+};

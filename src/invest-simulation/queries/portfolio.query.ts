@@ -5,6 +5,7 @@ import type {
   PositionWithAssetRow,
   TransactionWithAssetRow,
   UserCreditRow,
+  PortfolioValueSnapshotRow,
 } from '../types/index.js';
 
 @Injectable()
@@ -57,6 +58,32 @@ export class InvestPortfolioQuery {
         skip: 1,
         cursor: { id: cursor },
       }),
+    });
+  }
+
+  /** Recent portfolio value snapshots for a user (most recent first). */
+  async findRecentSnapshots(
+    userId: string,
+    limit: number = 30,
+  ): Promise<PortfolioValueSnapshotRow[]> {
+    return this.prisma.portfolioValueSnapshot.findMany({
+      where: { userId },
+      orderBy: { tickIndex: 'desc' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Snapshots within a tick window: tickIndex >= sinceTickIndex.
+   * Returned ascending by tickIndex (chart-ready order).
+   */
+  async findSnapshotsSinceTick(
+    userId: string,
+    sinceTickIndex: bigint,
+  ): Promise<PortfolioValueSnapshotRow[]> {
+    return this.prisma.portfolioValueSnapshot.findMany({
+      where: { userId, tickIndex: { gte: sinceTickIndex } },
+      orderBy: { tickIndex: 'asc' },
     });
   }
 }

@@ -11,12 +11,31 @@ import {
 import { AuthGuard } from '#app/auth/auth.guard.js';
 import { getUserId } from '#common/utils/auth.utils.js';
 import { InvestSimulationService } from './invest-simulation.service.js';
-import { BuyOrderDto, SellOrderDto } from './dto/index.js';
+import {
+  BalanceChartQueryDto,
+  BuyOrderDto,
+  SellOrderDto,
+} from './dto/index.js';
 
 @Controller('invest-simulation')
 @UseGuards(AuthGuard)
 export class InvestController {
   constructor(private readonly investService: InvestSimulationService) {}
+
+  // ── Dashboard ────────────────────────────────────────────────────
+
+  @Get('dashboard')
+  getDashboard(@Request() req: { user?: { id: string } }) {
+    return this.investService.getDashboard(getUserId(req));
+  }
+
+  @Get('dashboard/balance-chart')
+  getBalanceChart(
+    @Request() req: { user?: { id: string } },
+    @Query() query: BalanceChartQueryDto,
+  ) {
+    return this.investService.getBalanceChart(getUserId(req), query.period);
+  }
 
   // ── Market ───────────────────────────────────────────────────────
 
